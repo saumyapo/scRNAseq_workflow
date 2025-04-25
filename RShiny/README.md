@@ -6,3 +6,7 @@ Directory contains scripts for RShiny applications that can be used to visualise
 * The output of running the `ShinyCell` code is a directory called `shinyApp` which contains `server.R` and `ui.R` as well as the RDS file split into appropriate segments for easy visualisations.
 * Can directly `Run App` through either `server.R` or `ui.R` and do not need to make any modifications.
 
+## Visualising CellChat object interactively using `CellChatShiny`:
+* Standalone to interacticely visualise CellChat object.
+* Only makes plots which are non-comparative, at the single condition level (and not condition vs control).
+* Requires an RDS object called `cellchat.rds` to be in the same folder as the files.
