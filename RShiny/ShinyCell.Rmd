@@ -1,0 +1,29 @@
+---
+title: "ShinyCell Application for Seurat Object"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true # Adds numbers to headers
+    css: styles.css
+    code_folding: hide
+---
+
+```{r}
+library(shiny)
+library(Seurat)
+library(ShinyCell)
+```
+
+```{r}
+data.combined <- readRDS("/RDS/data_umap_10_clusters.RDS")
+scConf = createConfig(data.combined)
+data.combined <- JoinLayers(data.combined)
+makeShinyApp(data.combined, scConf, gene.mapping = TRUE,
+             shiny.title =  "Clustered Data")
+```
