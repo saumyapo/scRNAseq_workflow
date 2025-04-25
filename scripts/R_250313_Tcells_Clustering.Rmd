@@ -1,0 +1,612 @@
+---
+title: "T Cell Clustering"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# Load packages
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(SummarizedExperiment)
+library(htmlwidgets)
+library(htmltools)
+library(shiny)
+library(openxlsx)
+library(scDblFinder)
+library(hdf5r)
+library(harmony, lib.loc ="/hpc/users/pothus02/.Rlib")
+library(DT)
+```
+
+<!-- Information of Used Library -->
+### `r colorize('Information of Used R Libraries', 'blue')` 
+
+The following R libraries were used to process the data and produce this report.
+
+R: `r R.Version()$version.string`,
+
+dplyr: `r packageVersion('dplyr')`, 
+
+Seurat: `r packageVersion('Seurat')`, 
+
+patchwork: `r packageVersion('patchwork')`, 
+
+ggplot2: `r packageVersion('ggplot2')`, 
+
+cowplot: `r packageVersion('cowplot')`,
+
+scDblFinder: `r packageVersion('scDblFinder')`
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+suffix <- "Seurat"
+sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV090_LC", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
+
+SAMPLE_GROUP <- c("HIV", "HIV", "HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control", "Control", "Control", "Control","Control","Control","Control","Control")
+data_dir <- ("../raw_h5/")
+projectName <- "Immune HIV vs Control"
+h5_string <- "_filtered_feature_bc_matrix.h5"
+
+#Seurat parameters
+variables.features <- 2000
+nPCs <- 50
+```
+
+<!-- # `r colorize('T Cell Subcluster ', 'blue')` -->
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
+# tcell_subset <- subset(data.combined, idents = c("2","3","6","10","20","29"))
+```
+
+```{r, eval=FALSE, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# tcell_subset <- NormalizeData(tcell_subset, normalization.method = "LogNormalize", scale.factor = 10000)
+# tcell_subset <- FindVariableFeatures(tcell_subset, selection.method = "vst", nfeatures = 2000)
+# tcell_subset <- ScaleData(tcell_subset, verbose = FALSE)
+# 
+# #dimension reduction
+# tcell_subset <- RunPCA(tcell_subset, npcs = 50, verbose = FALSE)
+# # Run Harmony for batch correction
+# tcell_subset <- RunHarmony(tcell_subset, "sample_names")
+# tcell_subset <- RunUMAP(tcell_subset, reduction = "harmony", dims = 1:50)
+```
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#saveRDS(tcell_subset, file = paste("../RDS/tcell_subset_umap.RDS"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# tcell_subset <- readRDS("../RDS/tcell_subset_umap.RDS")
+# 
+# cluster_annotations <- c("2" = "T cells",
+#                          "3" = "T cells",
+#                          "6" = "T cells",
+#                          "10" = "T cells",
+#                          "20" = "T cells",
+#                          "29" = "T cells")
+# 
+# #Apply the new annotations to your Seurat object
+# tcell_subset$cluster_label <- plyr::mapvalues(
+#   Idents(tcell_subset),
+#    from = names(cluster_annotations),
+#   to = cluster_annotations
+# )
+# 
+# #Update the identities in the Seurat object
+# Idents(tcell_subset) <- tcell_subset$cluster_label
+```
+
+
+# `r colorize('T cells before clustering', 'blue')`
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+tcell_subset <- readRDS("../RDS/tcell_subset_umap.RDS")
+Idents(tcell_subset) <- "cluster_label"
+DimPlot(tcell_subset, reduction = "umap") + ggtitle ("T cells Before Clustering") 
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Extract raw counts for the neutrophil cluster (cluster 5)
+data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
+tcell_subset <- readRDS("../RDS/tcell_subset_umap.RDS")
+
+# Get the raw count of neutrophil cells
+T_count <- length(Cells(tcell_subset))
+
+# Get the total number of cells in the dataset
+total_cells <- length(Cells(data.combined))
+
+# Calculate the percentage of neutrophils in the dataset
+T_percentage <- (T_count / total_cells) * 100
+
+# Create a summary table
+summary_table <- data.frame(
+  "Cell Type" = c("T Cells", "Total Cells"),
+  "Raw Count" = c(T_count, total_cells),
+  "Percentage" = c(T_percentage, 100)
+)
+```
+
+# Cell Count for T Cells {.tabset}
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display the summary table
+paged_table(summary_table)
+```
+
+
+# `r colorize('Sub-clustering for T cells', 'blue')`
+
+```{r, eval = FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Do clustering
+# tcell_subset <- readRDS("../RDS/tcell_subset_umap.RDS")
+# tcell_subset <- FindNeighbors(tcell_subset, reduction = "harmony", dims = 1:50)
+# tcell_subset <- FindClusters(tcell_subset)
+
+#ncol(tcell_subset)
+```
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+Idents(tcell_subset) <- "seurat_clusters"
+# Check clustering UMAP
+DimPlot(tcell_subset, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
+
+#ElbowPlot(tcell_subset, ndims = 50)
+```
+
+```{r, eval = FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Save clustering data
+#saveRDS(tcell_subset, file = paste("../RDS/data_tcell_umap_19_clusters.RDS") )
+```
+
+# `r colorize('DEGS for 19 T Cell sub-clusters', 'blue')`
+
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Find All Markers
+# tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+# DefaultAssay(tcell_subset) <- "RNA"
+# Idents(tcell_subset) <- "condition"
+# tcell_subset <- JoinLayers(tcell_subset)
+# data.markers <- FindAllMarkers(tcell_subset, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+# # Save markers
+# write.csv(data.markers, file='../csvs/tcells/condition/data_tcell_all_markers_condition.csv')
+```
+
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Find All Markers
+# tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+# DefaultAssay(tcell_subset) <- "RNA"
+# Idents(tcell_subset) <- "seurat_clusters"
+# tcell_subset <- JoinLayers(tcell_subset)
+# data.markers <- FindAllMarkers(tcell_subset, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+# # Save markers
+# write.csv(data.markers, file='../csvs/data_tcell_all_markers_19_clusters.csv')
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read Markers .csv
+data.markers = read.csv('../csvs/tcells/data_tcell_all_markers_19_clusters.csv')
+data.markers$pct.diff = data.markers$pct.1 - data.markers$pct.2
+data.markers$pct.ratio = data.markers$pct.1 / data.markers$pct.2
+avglog_p = data.markers %>% group_by(cluster) %>% slice_max(n = 20, order_by = avg_log2FC)
+avglog_n = data.markers %>% group_by(cluster) %>% slice_min(n = 20, order_by = avg_log2FC)
+pctdiff_p = data.markers %>% group_by(cluster) %>% slice_max(n = 20, order_by = pct.diff)
+pctdiff_n = data.markers %>% group_by(cluster) %>% slice_min(n = 20, order_by = pct.diff)
+pctratio_p = data.markers %>% group_by(cluster) %>% slice_max(n = 20, order_by = pct.ratio)
+pctratio_n = data.markers %>% group_by(cluster) %>% slice_min(n = 20, order_by = pct.ratio)
+```
+
+
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+positive.markers = read.csv('../csvs/tcells/data_tcell_all_markers_19_clusters.csv')
+
+positive.markers$pct.diff = positive.markers$pct.1 - positive.markers$pct.2
+positive.markers$pct.ratio = positive.markers$pct.1 / positive.markers$pct.2
+
+# Keep positive markers only
+positive.markers <- positive.markers[positive.markers$pct.diff > 0.0,]
+
+positive.markers = positive.markers %>% group_by(cluster) %>% slice_max(n = 200, order_by = pct.diff)
+
+
+write.csv(positive.markers, file='../csvs/tcells/data_tcell_pos_markers_19_clusters.csv')
+
+```
+
+
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+paged_table(positive.markers)
+```
+
+## Positive markers {.tabset}
+While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
+
+### Top 20 Markers (avg_log2FC)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Create a table with a CSV download option
+datatable(
+  avglog_p, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv'),
+    filter = "top"  # Ensures a search box appears
+  )
+)
+```
+
+### Top 20 Markers (pctdiff)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+datatable(
+  pctdiff_p, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv'),
+    filter = "top"
+  )
+)
+```
+
+### Top 20 Markers (pct.ratio)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+datatable(
+  pctratio_p, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv', 'search')
+  )
+)
+```
+
+## Negative markers {.tabset}
+While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
+
+### Top 20 Markers (avg_log2FC)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Create a table with a CSV download option
+datatable(
+  avglog_n, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv'),
+    filter = "top"  # Ensures a search box appears
+  )
+)
+```
+
+### Top 20 Markers (pctdiff)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+datatable(
+  pctdiff_n, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv'),
+    filter = "top"
+  )
+)
+```
+
+### Top 20 Markers (pct.ratio)
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+datatable(
+  pctratio_n, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv', 'search')
+  )
+)
+```
+
+
+## All markers
+While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Create a table with a CSV download option
+datatable(
+  data.markers, 
+  extensions = 'Buttons', 
+  options = list(
+    dom = 'Bfrtip',
+    buttons = list('csv')
+  )
+)
+```
+
+
+
+
+```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+# 
+# cluster_annotations <- c("0" = "Naïve CD4+",
+#                          "1" = "Cytotoxic CD8+",
+#                          "2" = "Effector CD8+",
+#                          "3" = "Th17-like CD4+",
+#                          "4" = "Tregs",
+#                          "5" = "TFH",
+#                          "6" = "Tcm",
+#                          "7" = "Tcm",
+#                          "8" = "Tem",
+#                          "9" = "Tem",
+#                          "10" = "TRM",
+#                          "11" = "Exhausted CD8+",
+#                          "12" = "GDT",
+#                          "13" = "NK T cells",
+#                          "14" = "Proliferating",
+#                          "15" = "Proliferating",
+#                          "16" = "Proliferating",
+#                          "17" = "MAIT",
+#                          "18" = "Innate-like CD8+")
+# 
+# 
+# 
+# #Apply the new annotations to your Seurat object
+# tcell_subset$cluster_label <- plyr::mapvalues(
+#   Idents(tcell_subset),
+#    from = names(cluster_annotations),
+#   to = cluster_annotations
+# )
+# 
+# #Update the identities in the Seurat object
+# Idents(tcell_subset) <- tcell_subset$cluster_label
+# 
+# saveRDS(tcell_subset, "../RDS/data_tcell_umap_19_clusters.RDS")
+```
+
+
+# `r colorize('Annotated T cell clusters', 'blue')`
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+Idents(tcell_subset) <- "cluster_label"
+# Check clustering UMAP
+DimPlot(tcell_subset, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
+
+#ElbowPlot(tcell_subset, ndims = 50)
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Extract raw counts for the neutrophil cluster (cluster 5)
+#tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+
+treg_cells <- WhichCells(tcell_subset, ident = "Tregs")
+
+# Get the raw count of neutrophil cells
+treg_count <- length(treg_cells)
+
+# Get the total number of cells in the dataset
+total_cells <- length(Cells(tcell_subset))
+
+# Calculate the percentage of neutrophils in the dataset
+treg_percentage <- (treg_count / total_cells) * 100
+
+# Create a summary table
+summary_table <- data.frame(
+  "Cell Type" = c("Tregs", "Total Cells"),
+  "Raw Count" = c(treg_count, total_cells),
+  "Percentage" = c(treg_percentage, 100)
+)
+```
+
+# Cell Count for Tregs {.tabset}
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display the summary table
+paged_table(summary_table)
+```
+
+
+```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# # Read Seurat object
+# tcell_subset <- readRDS("../RDS/data_tcell_umap_19_clusters.RDS")
+# 
+# # Ensure RNA assay is set
+# DefaultAssay(tcell_subset) <- "RNA"
+# Idents(tcell_subset) <- "seurat_clusters"
+# 
+# tcell_subset <- JoinLayers(tcell_subset)
+# 
+# # Store subcluster identities (backup)
+# tcell_subset$subcluster <- Idents(tcell_subset)
+# 
+# # Set condition as active identity
+# Idents(tcell_subset) <- "condition"
+# 
+# # Create an empty list to store results
+# markers_list <- list()
+# 
+# # Loop over each subcluster
+# for (cluster in unique(tcell_subset$subcluster)) {
+#   # Subset data for the current subcluster
+#   subcluster_data <- subset(tcell_subset, subset = subcluster == cluster)
+# 
+#   # Set condition as active identity
+#   Idents(subcluster_data) <- "condition"
+# 
+#   # Find all markers between HIV and Control within this subcluster
+#   markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0)
+#   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
+# 
+#   # Store results with subcluster name
+#   markers_list[[paste0("Tcell_subcluster_", cluster)]] <- markers
+# }
+# 
+# # Save results to CSV
+# for (name in names(markers_list)) {
+#   write.csv(markers_list[[name]], file=paste0("../csvs/tcells/condition/", name, "_HIV_vs_Control.csv"))
+# }
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Get list of all subcluster DEG files
+subcluster_files <- list.files("../csvs/tcells/condition/", pattern = "^Tcell_", full.names = TRUE)
+
+# Initialize empty data frame to store counts
+deg_summary <- data.frame(Subcluster = character(), Num_Sig_DEGs = numeric(), stringsAsFactors = FALSE)
+
+# Loop through each file and count significant DEGs
+for (file in subcluster_files) {
+  # Read data
+  deg_data <- read.csv(file)
+  
+  # Filter for significant DEGs
+  sig_degs <- deg_data %>% filter(p_val_adj < 0.05 & abs(avg_log2FC) > 1) %>%
+  filter(!grepl("^MT", gene) & !grepl("^RB[SL]", gene))  # Exclude mitochondrial and ribosomal genes
+  
+  # Extract subcluster name from file name
+  subcluster_name <- gsub("../csvs/tcells/condition/|_HIV_vs_Control.csv", "", file)
+  
+  # Store result
+  deg_summary <- rbind(deg_summary, data.frame(Subcluster = subcluster_name, Num_Sig_DEGs = nrow(sig_degs)))
+}
+
+# Save summary to CSV
+#write.csv(deg_summary, "../csvs/DEG_Summary.csv", row.names = FALSE)
+```
+
+# `r colorize('Number of significant DEGs (HIV vs Control) in each subcluster', 'blue')` {.tabset}
+
+- p_val_adj < 0.05, and abs(log2fc) > 1
+
+- Not counting mitochondrial and ribosomal genes. They are still present in the data, but not being counted as DEGs.
+
+
+*p_val_adj was calculated using FDR instead of default BH which causes inflated values.
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Print summary
+paged_table(deg_summary)
+```
+
+# `r colorize('Volcano plot for DEGs for all subclusters', 'blue')` {.tabset}
+
+Not plotting mitochondrial and ribosomal genes. Present in the data but not including them as genes of interest.
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(ggrepel)
+
+# List of CSV files for each subcluster
+csv_files <-  list.files("../csvs/tcells/condition/", pattern = "^Tcell_", full.names = TRUE)
+
+# Function to generate volcano plot
+volcanoplot <- function(de, subcluster_name) {
+  # List of oligo types
+  types <- c("HIV")
+  
+  # Filter out mitochondrial and ribosomal genes
+  de <- de %>% filter(!grepl("^MT", gene) & !grepl("^RB[SL]", gene))
+  
+  de<- subset(de, cluster=="HIV")
+  
+  de$diffexpressed <- "NO"
+  de$diffexpressed[de$avg_log2FC < -0.25 & de$p_val < 0.05] <- "DOWN"
+  de$diffexpressed[de$avg_log2FC > 0.25 & de$p_val < 0.05] <- "UP"
+
+  subset_df <- de[complete.cases(de[, "gene"]), ]
+
+  c1 <- subset_df[subset_df[, "avg_log2FC"] > 0 & subset_df[, "p_val"] < 0.05, ]
+  c2 <- subset_df[subset_df[, "avg_log2FC"] < 0 & subset_df[, "p_val"] < 0.05, ]
+  c1_byavg_log2FC <- c1[order(c1$avg_log2FC, decreasing = TRUE), ]
+  c2_byavg_log2FC <- c2[order(c2$avg_log2FC, decreasing = FALSE), ]
+  c1_top10 <- head(c1_byavg_log2FC, 10)$gene
+  c2_top10 <- head(c2_byavg_log2FC, 10)$gene
+  labeled_proteins <- c(c1_top10, c2_top10)
+  de$delabel <- ifelse(de$gene %in% labeled_proteins & de$diffexpressed %in% c("UP", "DOWN"), de$X, NA)
+
+  ggplot(data = de, aes(x = avg_log2FC, y = -log10(p_val), col = diffexpressed, label = delabel)) +
+    geom_vline(xintercept = c(-0.25, 0.25), col = "gray", linetype = 'dashed') +
+    geom_hline(yintercept = -log10(0.05), col = "gray", linetype = 'dashed') + 
+    geom_point(data = de %>% filter(diffexpressed == "DOWN"), color = "#00AFBB", size = 0.8, alpha = 0.5) +
+    geom_point(data = de %>% filter(diffexpressed == "UP"), color = "#bb0c00", size = 0.8, alpha = 0.5) +
+    geom_point(data = de %>% filter(diffexpressed == "NO"), color = "gray", size = 0.8, alpha = 0.5) +
+    geom_text_repel(min.segment.length = 0, size = 2, max.overlaps = Inf, show.legend = FALSE) +
+    scale_color_manual(values = c("DOWN" = "black", "UP" = "black")) +
+    guides(color = guide_legend(title = NULL)) +
+    labs(x = expression("Upregulated in CONTROL <- avg log"[2]*"FC -> Upregulated in HIV"), 
+         y = expression("-log"[10]*"p-value"),
+         title = paste0("DEGs in ", subcluster_name, " HIV vs CONTROL")) +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = 0.5), axis.text = element_text(size = 16))
+}
+
+# Initialize list to store volcano plots
+volcano_plots <- list()
+
+# Loop through each CSV file, generate plots, and store them
+for (file in csv_files) {
+  if (grepl("Tcell_subcluster_\\d+_HIV_vs_Control.csv", file)) {
+    subcluster_name <- gsub(".*Tcell_subcluster_(\\d+)_HIV_vs_Control.csv", "Subcluster \\1", file)
+  } else if (grepl("Tcell_all_markers_condition.csv", file)) {
+    subcluster_name <- "Tcell (Overall)"
+  } else {
+    subcluster_name <- "Unknown"
+  }
+  
+  de <- read.csv(file)
+  
+  # Store the plot in the list
+  volcano_plots[[subcluster_name]] <- volcanoplot(de, subcluster_name)
+}
+
+# Print all volcano plots
+for (name in names(volcano_plots)) {
+  cat("##", name, "\n")
+  print(volcano_plots[[name]])
+  cat("\n\n")
+}
+
+```
+

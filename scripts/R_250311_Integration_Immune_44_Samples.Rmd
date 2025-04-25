@@ -1,0 +1,187 @@
+---
+title: "Immune 44 Samples HIV vs Control Integration"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# Load packages
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(SummarizedExperiment)
+library(htmlwidgets)
+library(htmltools)
+library(shiny)
+library(openxlsx)
+library(scDblFinder)
+library(hdf5r)
+library(harmony, lib.loc ="/hpc/users/pothus02/.Rlib")
+```
+
+<!-- Information of Used Library -->
+### `r colorize('Information of Used R Libraries', 'blue')` 
+
+The following R libraries were used to process the data and produce this report.
+
+R: `r R.Version()$version.string`,
+
+dplyr: `r packageVersion('dplyr')`, 
+
+Seurat: `r packageVersion('Seurat')`, 
+
+patchwork: `r packageVersion('patchwork')`, 
+
+ggplot2: `r packageVersion('ggplot2')`, 
+
+cowplot: `r packageVersion('cowplot')`,
+
+scDblFinder: `r packageVersion('scDblFinder')`
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+suffix <- "Seurat"
+sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV090_LC", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
+
+SAMPLE_GROUP <- c("HIV", "HIV", "HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control", "Control", "Control", "Control","Control","Control","Control","Control")
+data_dir <- ("../raw_h5/")
+projectName <- "Immune HIV vs Control"
+h5_string <- "_filtered_feature_bc_matrix.h5"
+
+#Seurat parameters
+variables.features <- 2000
+nPCs <- 50
+```
+
+### `r colorize('Integration of data to remove artifacts/batch effect', 'blue')`
+
+```{r, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# # Load raw data
+# data <- readRDS("../RDS/data_filtered_umap.RDS")
+# 
+# # split the dataset into a list of two seurat objects (stim and CTRL)
+# data.list = SplitObject(data, split.by = "sample")
+# 
+# # Get the intersection of features across all datasets
+# common_features <- Reduce(intersect, lapply(data.list, function(x) rownames(x)))
+# 
+# # Subset each Seurat object to include only the common features
+# data.list <- lapply(data.list, function(x) {
+#   x <- x[common_features, ]
+#   return(x)
+# })
+# 
+# data.list <- lapply(X = data.list, FUN = function(x) {
+#   x <- NormalizeData(x)  # Normalizing the data
+#   x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)  # Identifying variable features
+#   return(x)
+# })
+# 
+# features <- SelectIntegrationFeatures(object.list = data.list)
+```
+
+
+
+```{r,  eval=FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Perform integration
+# We then identify anchors using the FindIntegrationAnchors() function, which takes a list
+# of Seurat objects as input, and use these anchors to integrate the two datasets together with IntegrateData().
+# data.list <- readRDS("../RDS/data_list.RDS")
+# features <- readRDS("../RDS/features.RDS")
+# 
+#Use Harmony for Integration
+# data.combined <- readRDS("../RDS/data_filtered_umap.RDS")
+# data.combined <- RunHarmony(data.combined,"sample_names")
+# 
+# # Save raw data
+# saveRDS(data.combined, file = paste("../RDS/data_Integrated_44.RDS") )
+```
+
+```{r,  eval=FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Load raw data
+data.combined <- readRDS("../RDS/data_Integrated_44.RDS")
+```
+
+
+```{r,  eval=FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+#Run the standard workflow for visualization and clustering
+# data.combined <- ScaleData(data.combined, verbose = FALSE)
+# #Run UMAP using the Harmony embeddings, not the original PCA
+# data.combined <- RunUMAP(data.combined, reduction = "harmony", dims = 1:50)
+# 
+# #Save integrated data
+# saveRDS(data.combined, file = paste("../RDS/data_Integrated_44_umap.RDS") )
+```
+
+
+# `r colorize('UMAP for 44 samples before integration', 'blue')` {.tabset}
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Load non-integrated data
+data.bf <- readRDS("../RDS/data_combined_raw_umap.RDS")
+
+cat('##','All samples',' \n')
+DimPlot(data.bf, reduction = "umap", group.by= 'sample_names' ) + ggtitle('44 Samples before integration')+ theme(legend.position = "none")
+cat(' \n \n')
+
+# for (samp in sample_names_list) {
+#   cat('##',samp,' \n')
+#   print(DimPlot(subset(data.bf, subset = (sample_names %in% c(samp))), reduction = "umap") + ggtitle(samp))
+#   cat(' \n \n')
+# }
+```
+
+# `r colorize('UMAP for 44 samples after integration', 'blue')` {.tabset}
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Load integrated data
+data.combined <- readRDS("../RDS/data_Integrated_44_umap.RDS")
+
+cat('##','All samples',' \n')
+DimPlot(data.combined, reduction = "umap", group.by= 'sample_names' ) + ggtitle('44 Samples after integration') + theme(legend.position = "none") 
+cat(' \n \n')
+```
+
+
+
+
+

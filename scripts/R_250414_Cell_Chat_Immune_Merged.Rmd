@@ -1,0 +1,442 @@
+---
+title: "Immune 44 Samples Cell Chat Merged"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# Load packages
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(SummarizedExperiment)
+library(htmlwidgets)
+library(htmltools)
+library(shiny)
+library(openxlsx)
+library(scDblFinder)
+library(hdf5r)
+library(harmony, lib.loc ="/hpc/users/pothus02/.Rlib")
+library(DT)
+library(CellChat)
+library(biomaRt)
+library(ggalluvial)
+library(extrafont, lib.loc ="/hpc/users/pothus02/.Rlib")
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+suffix <- "Seurat"
+sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV090_LC", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
+
+SAMPLE_GROUP <- c("HIV", "HIV", "HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control", "Control", "Control", "Control","Control","Control","Control","Control")
+data_dir <- ("../raw_h5/")
+projectName <- "Immune HIV vs Control"
+h5_string <- "_filtered_feature_bc_matrix.h5"
+
+#Seurat parameters
+variables.features <- 2000
+nPCs <- 50
+```
+
+```{r, eval = FALSE, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# cellchat_hiv <- readRDS("../RDS/cell_chat_hiv.RDS")
+# cellchat_control <- readRDS("../RDS/cell_chat_control.RDS")
+# 
+# object.list <- list(HIV = cellchat_hiv, NV = cellchat_control)
+# 
+# names(object.list)
+# 
+# cellchat <- mergeCellChat(object.list, add.names = names(object.list))
+# 
+# saveRDS(cellchat, "../RDS/cellchat_merged.RDS")
+
+# saveRDS(object.list, "../RDS/cellchat_merged_object_list.RDS")
+```
+
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+cellchat <- readRDS("../RDS/cellchat_merged.RDS")
+object.list <- readRDS("../RDS/cellchat_merged_object_list.RDS")
+```
+
+# 1. Overall Pathway Comparison between HIV and NV {.tabset}
+
+Pathways solely enriched in HIV:
+1. GALECTIN
+2. CEACAM
+3. GAS
+4. PROS
+5. CD86
+6. PLAU
+7. IFN-II
+
+Pathways solely enriched in NV:
+1. PVR
+2. CD96
+
+Colour coded based on enrichment + whether that difference is statistically significant. Black means equal in both.
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# 1. Compare the overall information flow of each signaling pathway
+cat("##", "Overall Pathway Flow", "\n")
+rankNet(cellchat, mode = "comparison", stacked = T, do.stat = TRUE) # 68 & 63 pathways, HIV | NV
+#rankNet(cellchat, mode = "comparison", stacked = F, do.stat = TRUE) To plot red/blue for each pathway
+cat("\n \n")
+
+#rankNet(cellchat, mode = "comparison", stacked = T, do.stat = TRUE, sources.use = "PC", title = "PC")
+```
+# 2. Total Number of Interactions and Interaction Strength {.tabset}
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# 2. Compare the total number of interactions and interaction strength
+cat("##", "Total Count", "\n")
+compareInteractions(cellchat, show.legend = F, group = c(1,2), measure = "count")
+cat("\n \n")
+
+cat("##", "Total Weight", "\n")
+compareInteractions(cellchat, show.legend = F, group = c(1,2), measure = "weight")
+cat("\n \n")
+```
+
+# 3. Outgoing/Incoming interaction strength for all cell types {.tabset}
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+###### scatter plot 
+# 1.Compare outgoing/incoming interaction strength for all the cell types
+count.sum <- sapply(object.list, function(x) {rowSums(x@net$count) + 
+    colSums(x@net$count)-diag(x@net$count)})
+weight.MinMax <- c(min(count.sum), max(count.sum)) # control the dot size 
+gg <- list()
+for (i in 1:length(object.list)) {
+  gg[[i]] <- netAnalysis_signalingRole_scatter(object.list[[i]], 
+  title = names(object.list)[i], weight.MinMax = weight.MinMax)
+}
+
+patchwork::wrap_plots(plots = gg)
+
+# cat("##", "HIV", "\n")
+# gg[1]
+# cat("\n \n")
+# 
+# cat("##", "NV", "\n")
+# gg[2]
+# cat("\n \n")
+```
+
+
+#  4. Signaling changes associated with one cell group {.tabset}
+
+Scatter plot shows the relative changes in overall signaling strength for each pathway between two groups. The axes represent:
+X-axis: Information flow (i.e., total communication probability) in Group 1 (HIV)
+Y-axis: Information flow in Group 2 (NV)
+The size of the dot usually reflects the overall communication strength (sum of probabilities).
+
+Positive values = upregulated, negative values = downregulated
+Can include/exclude specific pathways if need be, like collagen.
+
+No set cutoff threshold but:
+
+| Value  | Range | Interpretation |
+|--|--|--|
+|< 0.01	|Very weak | Noise/background
+| 0.01–0.05 | Weak to moderate |Worth considering if specific or known pathways
+| 0.05–0.1 | Moderate |If consistent across samples
+| 0.1 |Strong  |More biologically relevant
+|0.2 or 0.3|Very strong|Important biologically
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# 2. identify signalling changes associated with one cell group 
+#netAnalysis_signalingChanges_scatter(cellchat, idents.use = "ILC", 
+#                                     signaling.exclude = "MHC-I")
+
+cat("##", "ILC", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "ILC")
+cat("\n \n")
+
+cat("##", "CD8 T", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "CD8 T")
+cat("\n \n")
+
+cat("##", "CD4 T", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "CD4 T")
+cat("\n \n")
+
+cat("##", "PC", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "PC")
+cat("\n \n")
+
+cat("##", "Mast cell", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Mast cell")
+cat("\n \n")
+
+cat("##", "B cell", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "B cell")
+cat("\n \n")
+
+cat("##", "ABCA8 Stroma", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "ABCA8 Stroma")
+cat("\n \n")
+
+cat("##", "Endothelial cells", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Endothelial cells")
+cat("\n \n")
+
+cat("##", "Epithelial", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Epithelial")
+cat("\n \n")
+
+cat("##", "Tuft", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Tuft")
+cat("\n \n")
+
+cat("##", "Stroma", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Stroma")
+cat("\n \n")
+
+cat("##", "Myeloid", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Myeloid")
+cat("\n \n")
+
+cat("##", "Treg", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Treg")
+cat("\n \n")
+
+cat("##", "Glia", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Glia")
+cat("\n \n")
+
+cat("##", "PDGFRA Stroma", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "PDGFRA Stroma")
+cat("\n \n")
+
+cat("##", "Proliferating", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Proliferating")
+cat("\n \n")
+
+cat("##", "IgG PC", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "IgG PC")
+cat("\n \n")
+
+cat("##", "Goblet cells", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Goblet cells")
+cat("\n \n")
+
+cat("##", "Pericyte", "\n")
+netAnalysis_signalingChanges_scatter(cellchat, idents.use = "Pericyte")
+cat("\n \n")
+```
+
+# 5. Circle Plots: Number of interactions between any two cell populations {.tabset}
+
+Can pick specific cell types
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# 1. show the number of interactions between any two cell populations 
+# compute the maximum number of cells and the maximum number of interactions 
+weight.max <- getMaxWeight(object.list, attribute = c("idents","count"))
+
+par(mfrow = c(1,2), xpd=TRUE)
+cat("##", "All Pathways", "\n")
+for (i in 1:length(object.list)) {
+  netVisual_circle(object.list[[i]]@net$count, weight.scale = T, label.edge= F,
+  edge.weight.max = weight.max[2], edge.width.max = 12, arrow.size = 0.1,
+  title.name = paste0("Number of interactions - ", names(object.list)[i]))
+}
+cat("\n \n")
+
+
+# 2. selected pathway
+weight.max <- getMaxWeight(object.list, slot.name = c("netP"), 
+                           attribute =c("CXCL"))
+
+par(mfrow = c(1,2), xpd=TRUE)
+cat("##", "Specific Pathway", "\n")
+for (i in 1:length(object.list)) {
+  netVisual_aggregate(object.list[[i]], signaling = c("CXCL"), layout = "circle",
+  edge.weight.max = weight.max[1], edge.width.max = 10, arrow.size = 0.05, 
+  signaling.name = paste("CXCL", names(object.list)[i]))
+}
+cat("\n \n")
+```
+
+# 5. Circle Plot - Differential Expression {.tabset}
+
+HIV vs NV
+
+Red arrows - upregulation
+Blue arrows - downregulation
+
+Can pick specific cell types
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# 3. Show differential number of interactions or interaction strength among 
+# different cell populations, red(increased signaling)/blue(decreased signaling)
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_diffInteraction(cellchat, comparison = c(1, 2), measure = "count", 
+                          weight.scale = T, arrow.size = 0.1)
+netVisual_diffInteraction(cellchat, comparison = c(1, 2), measure = "weight", 
+                          weight.scale = T, arrow.size = 0.1)
+
+
+# 4. simplify the complicated network to the cell type level - pick cell types of interest.
+# group.cellType <- c(rep("FIB", 4), rep("DC", 4), rep("TC", 4))
+# group.cellType <- factor(group.cellType, levels = c("FIB", "DC", "TC"))
+# object.list <- lapply(object.list, function(x) {
+#                               mergeInteractions(x, group.cellType)})
+# cellchat <- mergeCellChat(object.list, add.names = names(object.list))
+# 
+# weight.max <- getMaxWeight(object.list, slot.name = c("idents", "net", "net"), 
+#                            attribute = c("idents", "count", "count.merged"))
+# 
+# # show the number of interactions or interaction strength.
+# par(mfrow = c(1,2), xpd=TRUE)
+# for (i in 1:length(object.list)) {
+#      netVisual_circle(object.list[[i]]@net$count.merged, weight.scale = T, 
+#      label.edge= T, edge.weight.max = weight.max[3], edge.width.max = 12, 
+#      arrow.size = 0.1,
+#      title.name = paste0("Number of interactions - ", names(object.list)[i]))
+# }
+
+```
+
+# 6. Heatmaps {.tabset}
+
+In differential heatmap, red = upregulated, blue = downregulated
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.height= 8}
+library(ComplexHeatmap)
+# 1. Compare outgoing/incoming signaling associated with each cell population
+# combining all the identified signaling pathways from different datasets 
+all_pathways <- union(object.list[[1]]@netP$pathways, 
+                       object.list[[2]]@netP$pathways)
+
+ht1 = netAnalysis_signalingRole_heatmap(object.list[[1]], pattern = "all", 
+      signaling = all_pathways, title = names(object.list)[1],  
+      width = 5, height = 11, color.heatmap = "OrRd")
+ht2 = netAnalysis_signalingRole_heatmap(object.list[[2]], pattern = "all", 
+      signaling = all_pathways, title = names(object.list)[2], 
+      width = 5, height = 11, color.heatmap = "OrRd")
+cat("##", "Overall Heatmap", " \n")
+draw(ht1 + ht2, ht_gap = unit(0.5, "cm"))
+cat(" \n \n")
+
+ht3 = netAnalysis_signalingRole_heatmap(object.list[[1]], pattern ="outgoing", 
+      signaling = all_pathways, title = names(object.list)[1], 
+      width = 5, height = 11)
+ht4 = netAnalysis_signalingRole_heatmap(object.list[[2]], pattern ="outgoing", 
+      signaling = all_pathways, title = names(object.list)[2], 
+      width = 5, height = 11)
+cat("##", "Outgoing Heatmap", " \n")
+draw(ht3 + ht4, ht_gap = unit(0.5, "cm"))
+cat(" \n \n")
+
+
+ht5 = netAnalysis_signalingRole_heatmap(object.list[[1]], pattern = "incoming", 
+      signaling = all_pathways, title = names(object.list)[1], 
+      width = 5, height = 11, color.heatmap = "GnBu")
+ht6 = netAnalysis_signalingRole_heatmap(object.list[[2]], pattern ="incoming",
+      signaling = all_pathways, title = names(object.list)[2], 
+      width = 5, height = 11, color.heatmap = "GnBu")
+cat("##", "Incoming Heatmap", " \n")
+draw(ht5 + ht6, ht_gap = unit(0.5, "cm"))
+cat(" \n \n")
+
+# 2. selected pathways
+par(mfrow = c(1,2), xpd=TRUE)
+ht <- list()
+for (i in 1:length(object.list)) {
+  ht[[i]] <- netVisual_heatmap(object.list[[i]], signaling = c("CXCL"), 
+  title.name = paste("CXCL", "signaling ",names(object.list)[i]),
+  color.heatmap = "Reds")
+}
+cat("##", "CXCL pathway", " \n")
+ComplexHeatmap::draw(ht[[1]] + ht[[2]], ht_gap = unit(0.5, "cm"))
+cat(" \n \n")
+
+# 3. Differential Interactions
+gg1 <- netVisual_heatmap(cellchat, comparison = c(1, 2), measure = "count")
+gg2 <- netVisual_heatmap(cellchat, comparison = c(1, 2), measure = "weight")
+cat("##", "Differential Heatmap", " \n")
+gg1 + gg2
+cat(" \n \n")
+```
+# 7. Bubble Plot {.tabset}
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Chord diagram
+
+# 1. compare communication probabilities mediated by ligand-receptor pairs from 
+# selected sources and targets cell groups 
+cat("##", "Overall Bubbleplot", " \n")
+netVisual_bubble(cellchat, sources.use = 9, targets.use = c(10:19),  
+                 comparison = c(1, 2), angle.x = 45)
+cat(" \n \n")
+
+# 2. identify the up-regulated ligand-receptor pairs
+cat("##", "Top Upregulated LRs in HIV", " \n")
+netVisual_bubble(cellchat, sources.use = 9, targets.use = c(10:19),
+                 comparison = c(1, 2), max.dataset = 1,
+                 title.name = "Increased signaling in HIV", angle.x = 45,
+                 remove.isolate = T)
+cat(" \n \n")
+
+# 2. identify the down-regulated ligand-receptor pairs
+cat("##", "Top Downregulated LRs in HIV", " \n")
+netVisual_bubble(cellchat, sources.use = 9, targets.use = c(10:19),  
+                 comparison = c(1, 2), max.dataset = 2, 
+                 title.name = "Decreased signaling in HIV", angle.x = 45, 
+                 remove.isolate = T) 
+cat(" \n \n")
+```
+
+# 8. Violin Plot {.tabset}
+For a specific pathway
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+cat("##", "CXCL Pathway", " \n")
+plotGeneExpression(cellchat, signaling = "CXCL", split.by = "condition", 
+                   colors.ggplot = T)
+cat(" \n \n")
+
+```
+
+

@@ -1,0 +1,368 @@
+---
+title: "GSEA Analysis for Immune 44 Samples"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true #adds numbers to headers
+    code_folding: hide
+---
+
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+            x)
+  } else x
+}
+```
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+
+```{r, results = FALSE, message = FALSE}
+# Load required libraries
+library(openxlsx)
+library(clusterProfiler)
+library(msigdbr, lib.loc = "/hpc/users/pothus02/.Rlib")
+library(org.Hs.eg.db)
+library(tidyverse)
+library(readxl)
+library(rmarkdown)
+library(ggplot2)
+library(fgsea)
+library(msigdbdf, lib.loc = "/hpc/users/pothus02/.Rlib")
+```
+
+<!-- Information of Used Library -->
+### `r colorize('Information of Used R Libraries', 'blue')` 
+
+The following R libraries were used to process the data and produce this report.
+
+
+R: `r R.Version()$version.string`,
+
+openxlsx: `r packageVersion('openxlsx')`,
+
+clusterProfiler: `r packageVersion('clusterProfiler')`, 
+
+msigdbr: `r packageVersion('msigdbr')`, 
+
+org.Hs.eg.db: `r packageVersion('org.Hs.eg.db')`, 
+
+tidyverse: `r packageVersion('tidyverse')`,
+
+readxl: `r packageVersion('readxl')`, 
+
+rmarkdown: `r packageVersion('rmarkdown')`,
+
+ggplot2: `r packageVersion('ggplot2')`
+
+```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# # Read Seurat object
+# data.combined <- readRDS("../RDS/data_filt_44_umap_29_clusters.RDS")
+# 
+# # Ensure RNA assay is set
+# DefaultAssay(data.combined) <- "RNA"
+# Idents(data.combined) <- "seurat_clusters"
+# 
+# # Store subcluster identities (backup)
+# data.combined$subcluster <- Idents(data.combined)
+# 
+# # Set condition as active identity
+# Idents(data.combined) <- "condition"
+# data.combined <- JoinLayers(data.combined)
+# # Create an empty list to store results
+# markers_list <- list()
+# 
+# # Loop over each subcluster
+# for (cluster in unique(data.combined$subcluster)) {
+#   #Subset data for the current subcluster
+#   message(paste0("Processing cluster: ", cluster))
+#   subcluster_data <- subset(data.combined, subset = subcluster == cluster)
+# 
+#   # Set condition as active identity
+#   Idents(subcluster_data) <- "condition"
+# 
+#   # Find all markers between HIV and Control within this subcluster
+#   markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+#   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
+#   # Store results with subcluster name
+#   markers_list[[paste0("immune_44_cluster_", cluster)]] <- markers
+# }
+# 
+# # Save results to CSV
+# for (name in names(markers_list)) {
+#   write.csv(markers_list[[name]], file=paste0("../csvs/condition/", name, "_HIV_vs_Control.csv"))
+# }
+```
+
+
+```{r, eval=FALSE, results = FALSE, message = FALSE}
+
+# Set the path to your CSV files
+csv_dir <- "../csvs/condition/"
+
+# Prepare gene sets for human
+#Picking the same categories as used for DAVID analysis
+set.seed(2024)
+human_gobp_sets <- msigdbr(species = "Homo sapiens", category = "C5", subcollection = "GO:BP")
+human_kegg_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcollection = "CP:KEGG_LEGACY")
+human_reactome_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcollection = "CP:REACTOME")
+
+human_gene_sets <- rbind(human_gobp_sets, human_kegg_sets, human_reactome_sets)
+```
+
+```{r, eval=FALSE, results = FALSE, message = FALSE}
+# Define the GSEA function for human
+gsea_human <- function(df, condition){
+  df_cluster <- df %>% dplyr::filter(cluster == condition)
+  lfc_vector <- df_cluster$avg_log2FC
+  names(lfc_vector) <- df_cluster$gene
+  lfc_vector <- sort(lfc_vector, decreasing = TRUE)
+
+  pathways_list <- split(human_gene_sets$gene_symbol, human_gene_sets$gs_name)
+
+  gsea_result <- fgsea(
+      pathways = pathways_list,
+      stats = lfc_vector,
+      minSize = 5,
+      maxSize = 500,
+      nPermSimple = 10000
+    )
+    
+  gsea_result$p.adjust <- p.adjust(gsea_result$pval, method = "fdr")
+  
+  return(gsea_result)
+}
+```
+
+```{r, eval=FALSE, results = FALSE, message = FALSE}
+# List all relevant CSV files
+csv_files <- list.files(csv_dir, pattern = "_HIV_vs_Control.csv", full.names = TRUE)
+
+# Create a master list to collect results
+all_gsea_results <- list()
+
+# Loop through each file
+for (csv_path in csv_files) {
+  subcluster_name <- tools::file_path_sans_ext(basename(csv_path))
+  message("Processing: ", subcluster_name)
+
+  df <- read.csv(csv_path)
+
+  # Skip subclusters with insufficient gene info
+  if (!("gene" %in% colnames(df)) || nrow(df) < 10) {
+    warning("Skipping ", subcluster_name, " due to missing 'gene' column or low gene count.")
+    next
+  }
+  condition <- "HIV"
+  gsea_result <- gsea_human(df, condition)
+
+
+  # Append results with an identifying column
+  gsea_result$subcluster <- subcluster_name
+  all_gsea_results[[subcluster_name]] <- gsea_result
+}
+
+# Combine and export
+combined_results <- do.call(rbind, all_gsea_results)
+write.xlsx(combined_results, file = "../csvs/condition/immune_44_combined_GSEA_results.xlsx")
+```
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Read the input CSV file
+# degs_samples <- read_csv("../csvs/data_filt_44_all_markers_29_clusters.csv")
+# 
+# # Define conditions (clusters) from input csv file
+# conditions_samples <- as.character(unique(degs_samples$cluster))
+```
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Perform GSEA for all conditions and collect results
+
+# gsea_results_samples<- data.frame()
+# for (i in conditions_samples) {
+#   gsea_samples_tmp <- gsea_human(degs_samples, i) %>% dplyr::mutate(cluster = i)
+#   gsea_results_samples <- rbind(gsea_results_samples, gsea_samples_tmp)
+# }
+```
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# # Split the results by condition
+# results_list_samples <- list()
+# for (type in conditions_samples) {
+#   type_results_samples <- gsea_results_samples %>% dplyr::filter(cluster == type) %>% dplyr::select(-cluster)
+#   results_list_samples[[type]] <- type_results_samples
+# }
+```
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# # Create a list of data frames for writing to Excel
+# write.xlsx(results_list_samples, file = "../csvs/ClusterProfiler_GSEA_Immune_44_samples.xlsx")
+# write.xlsx(gsea_results_samples, file = "../csvs/GSEA_Cluster_Info_Immune_44_Samples.xlsx")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Read the sheets into data frames
+samples_results <- read_excel("../csvs/condition/immune_44_combined_GSEA_results.xlsx")
+```
+
+## `r colorize('ClusterProfiler Results', 'blue')` {.tabset}
+
+### Understanding the output
+
+The output of the enrichment analysis is an excel file divided into subsheets based on clusters (JAK2 conditions) which has 11 headers and explanation on each of the headers can be found below:
+
+1. ID: Identifier for the gene set. This is the identifier of the pathway or gene ontology term associated with the gene set.
+
+2. Description: Description of the gene set. This typically provides additional details about the pathway or biological process represented by the gene set.
+
+3. setSize: Size of the gene set, i.e., the number of genes included in the gene set.
+
+4. enrichmentScore: The enrichment score computed by the gene set enrichment analysis. This score indicates the degree to which the gene set is overrepresented at the top or bottom of a ranked list of genes (based on fold changes or another ranking metric).  A higher enrichmentScore (closer to 1 or -1) indicates stronger enrichment, which is desirable as it suggests that the gene set is significantly overrepresented in the analyzed dataset. 
+
+5. NES (Normalized Enrichment Score): The normalized enrichment score, which is the enrichment score normalized to account for differences in gene set sizes and correlations between gene sets and the data being analyzed. Higher NES is desired and considered more reliable whereas A NES close to 0 indicates no enrichment.
+
+6. pvalue: The p-value associated with the enrichment score. It indicates the statistical significance of the enrichment of the gene set in the ranked list of genes. Lower p value is better.
+
+7. p.adjust: The adjusted p-value after multiple testing correction. Adjusted using Benjamini-Hochberg (BH) procedure. Lower values are better.
+
+8. qvalue: The q-value, which is another measure of significance adjusted for multiple testing. It is similar to the adjusted p-value. Lower values are better.
+
+9. rank: The rank at which the gene set achieves its maximum enrichment score in the ranked list of genes. A lower rank indicates that the gene set is enriched towards the top of the ranked list of genes, which is desirable as it suggests higher significance. 
+
+10. leading_edge: Information about the leading edge subset of genes contributing to the enrichment score. This typically includes the percentage of tags, list, and signal genes in the leading edge. Higher percentage contribution indicates a substantial contribution of these genes to the observed enrichment.
+
+11. core_enrichment: Specific genes involved in the core enrichment of the gene set. These are often the key members of the gene set contributing to its enrichment score.
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display the contents of the sheets using paged_table
+cat('###', "Samples Results", ' \n')
+paged_table(samples_results)
+cat(' \n \n')
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to plot up/down pathways safely
+plot_top_pathways <- function(gsea_results, top_n = 10) {
+  
+  significant_results <- gsea_results %>%
+    dplyr::filter(p.adjust < 0.05)
+  
+  top_up <- significant_results %>%
+    filter(NES > 0) %>%
+    arrange(desc(NES)) %>%
+    head(top_n)
+  
+  top_down <- significant_results %>%
+    filter(NES < 0) %>%
+    arrange(NES) %>%
+    head(top_n)
+  
+  up_plot <- if (nrow(top_up) > 0) {
+    ggplot(top_up, aes(x = reorder(pathway, NES), y = NES)) +
+      geom_bar(stat = "identity", fill = "darkred") +
+      coord_flip() +
+      labs(title = "Top 10 Upregulated Pathways", x = "Pathway", y = "NES") +
+      theme_minimal() +
+      theme(axis.text.y = element_text(size = 6))
+  } else {
+    ggplot() + 
+      annotate("text", x = 1, y = 1, label = "No significantly upregulated pathways") + 
+      theme_void()
+  }
+
+  down_plot <- if (nrow(top_down) > 0) {
+    ggplot(top_down, aes(x = reorder(pathway, -NES), y = NES)) +
+    geom_bar(stat = "identity", fill = "skyblue") +
+    coord_flip() +
+    labs(title = "Top 10 Downregulated Pathways Based on NES", x = "Pathway", y = "Normalized Enrichment Score (NES)") +
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 6))
+  } else {
+    ggplot() + 
+      annotate("text", x = 1, y = 1, label = "No significantly downregulated pathways") + 
+      theme_void()
+  }
+
+  return(list(up_plot = up_plot, down_plot = down_plot))
+}
+```
+
+
+```{r, results = FALSE, message = FALSE}
+# Path to CSVs
+# Store plots by cluster
+#str(samples_results)
+plots_by_cluster <- list()
+unique_clusters <- unique(samples_results$subcluster)
+
+for (clust in unique_clusters) {
+  clust_data <- samples_results %>% filter(subcluster == clust)
+  plots_by_cluster[[as.character(clust)]] <- plot_top_pathways(clust_data)
+}
+```
+
+<!-- ## `r colorize('Barplots', 'blue')` {.tabset} -->
+
+## Barplots {.tabset}
+
+Top 10 Upregulated and Downregulated Pathways based on NES
+
+```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE,fig.width=10,fig.height=6}
+
+for (clust in names(plots_by_cluster)) {
+  subcluster_clean <- gsub(".*?(cluster_\\d+).*", "\\1", clust)
+
+  cat('###', subcluster_clean, '{.tabset}\n\n')
+  
+  cat('#### Upregulated\n\n')
+  print(plots_by_cluster[[clust]]$up_plot)
+  cat('\n\n')
+  
+  cat('#### Downregulated\n\n')
+  print(plots_by_cluster[[clust]]$down_plot)
+  cat('\n\n')
+}
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# PDF marker plot 
+# pdf("pdf_clusterprofiler_samples.pdf", width = 10, height = 8, useDingbats = FALSE)
+# print(plots_samples$up_plot)
+# print(plots_samples$down_plot)
+# dev.off()
+```
+
+

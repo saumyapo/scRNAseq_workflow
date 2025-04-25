@@ -1,0 +1,491 @@
+---
+title: "Immune 44 Samples HIV vs Control"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Markdown parameters
+set_echo = FALSE
+set_eval = FALSE
+```
+
+```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Function to set markdown text color
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
+
+
+```{r, include=FALSE}
+# Set height of chunk output
+options(width = 60)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+```
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# Load packages
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(ggplot2)
+library(cowplot)
+library(rmarkdown)
+library(SummarizedExperiment)
+library(htmlwidgets)
+library(htmltools)
+library(shiny)
+library(openxlsx)
+library(scDblFinder)
+library(hdf5r)
+```
+
+<!-- Information of Used Library -->
+### `r colorize('Information of Used R Libraries', 'blue')` 
+
+The following R libraries were used to process the data and produce this report.
+
+R: `r R.Version()$version.string`,
+
+dplyr: `r packageVersion('dplyr')`, 
+
+Seurat: `r packageVersion('Seurat')`, 
+
+patchwork: `r packageVersion('patchwork')`, 
+
+ggplot2: `r packageVersion('ggplot2')`, 
+
+cowplot: `r packageVersion('cowplot')`,
+
+scDblFinder: `r packageVersion('scDblFinder')`
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+suffix <- "Seurat"
+sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
+
+data_dir <- ("../../raw_h5")
+projectName <- "Immune HIV vs Control"
+h5_string <- "_filtered_feature_bc_matrix.h5"
+
+#Seurat parameters
+variables.features <- 2000
+nPCs <- 50
+```
+
+```{r,  eval=FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# # Define filenames and sample names for both IBDU013
+# filenames <- c(file.path(data_dir, paste0(sampleNames, h5_string)))
+# filenames
+# # Create a list to store Seurat objects
+# seurat_list <- list()
+# 
+# # Loop through filenames and create Seurat objects
+# for (i in 1:length(filenames)) {
+#   raw_data <- Read10X_h5(filenames[i], use.names = TRUE, unique.features = TRUE)
+#   seurat_obj <- CreateSeuratObject(counts = raw_data,
+#                                    project = "Combined_HIV_Immune",
+#                                    min.cells = 3,
+#                                    min.features = 200)
+#   # Add sample name to orig.ident
+#   seurat_obj$orig.ident <- sampleNames[i]
+# 
+#   # Store in the list
+#   seurat_list[[i]] <- seurat_obj
+# }
+# 
+# # Merge all Seurat objects into one
+# combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
+# 
+# combined_data@meta.data$sample_names <- combined_data@meta.data$orig.ident
+# 
+# #Save the combined Seurat object
+# saveRDS(combined_data, file = "../RDS/data_combined_raw.RDS")
+```
+
+
+```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# df <- data.frame (
+#   Sample = sampleNames,
+#   Condition = sample_to_group
+# )
+# print(df)
+```
+
+
+```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# # #Add condition information based on sample names
+# data <- readRDS("../RDS/data_combined_raw.RDS")
+# 
+# sample_to_group <- c("DART002LC_BL" = "HIV",
+#                     "DART003LC" = "HIV",
+#                     "DART005LC" = "HIV",
+#                     "DART006LC" = "HIV",
+#                     "DART007LC" = "HIV",
+#                     "HIV018_CA" = "HIV",
+#                     "HIV022_CA" = "HIV",
+#                     "HIV032_CA" = "HIV",
+#                     "HIV058_LP" = "HIV",
+#                     "HIV063_LP" = "HIV",
+#                     "HIV075_LP" = "HIV",
+#                     "HIV076_LP" = "HIV",
+#                     "HIV077_LP" = "HIV",
+#                     "HIV078_LP" = "HIV",
+#                     "HIV080_LP" = "HIV",
+#                     "HIV081_LP" = "HIV",
+#                     "HIV082_LP" = "HIV",
+#                     "HIV083_LC" = "HIV",
+#                     "HIV084_LP" = "HIV",
+#                     "HIV086_LC" = "HIV",
+#                     "HIV087_LP" = "HIV",
+#                     "HIV091_LC" = "HIV",
+#                     "HIV092_LC" = "HIV",
+#                     "HIV093_LC" = "HIV",
+#                     "HIV094_LC" = "HIV",
+#                     "HIV098_LC" = "HIV",
+#                     "NV144_LP" = "Control",
+#                     "NV157_LP_LC" = "Control",
+#                     "NV159_LP_LC" = "Control",
+#                     "NV161_LC" = "Control",
+#                     "NV162_LP_LC" = "Control",
+#                     "NV186_LP" = "Control",
+#                     "NV201_LP" = "Control",
+#                     "NV203_LP" = "Control",
+#                     "NV205_LP" = "Control",
+#                     "NV212_LC" = "Control",
+#                     "NV213_LC" = "Control",
+#                     "NV216_LP" = "Control",
+#                     "NV222_LP" = "Control",
+#                     "NV225_LP" = "Control",
+#                     "NV230_LP" = "Control",
+#                     "NV234_LC" = "Control",
+#                     "NV244_LC" = "Control",
+#                     "NV245_LC" = "Control"
+#                     )
+# 
+# 
+# # Apply the new annotations to your Seurat object
+# data$condition <- plyr::mapvalues(
+#   data$sample_names,
+#   from = names(sample_to_group),
+#   to = sample_to_group
+# )
+# 
+# unique(data$condition)
+```
+
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
+```
+
+
+```{r, eval = FALSE, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
+# data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+# data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+# data <- ScaleData(data, verbose = FALSE)
+# 
+# #dimension reduction
+# data <- RunPCA(data, npcs = 50, verbose = FALSE)
+# data <- RunUMAP(data, reduction = "pca", dims = 1:50)
+```
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
+```
+
+# `r colorize("Non-integrated 44 immune samples (HIV and control), before QC", "blue")` {.tabset}
+
+```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+data <- readRDS("../RDS/data_combined_raw_umap.RDS")
+
+cat("##", "Samples", " \n")
+DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("Before Integration and QC") + theme(legend.position = "none")
+cat(" \n \n")
+cat("##", "Condition", " \n")
+DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("Before Integration and QC")
+cat(" \n \n")
+```
+
+
+# `r colorize("QC: Checking mitochondrial and ribosomal gene percentages", "blue")` {.tabset}
+
+There are no ribosomal genes in the dataset.
+Cells with > 20% mitochondrial percentage and nFeature_RNA <200 OR >2500 were filtered. 
+
+Note: nFeature_RNA is the total number of genes detected in each cell. It counts how many genes show a non-zero expression level for a given cell, and <200 is a low quality cell, and >2500 is assumed to be a doublet due to higher than normal expression levels.
+
+```{r, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# #Check mitochondrial gene names
+# gene_names <- rownames(data)
+# mt_genes <- grep("^MT-", gene_names, value = TRUE)
+# print(mt_genes)
+# 
+# data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
+# 
+# #Add new column with mitochondrial percentage information
+# data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
+# 
+# 
+# #Check ribosomal gene names
+# gene_names <- rownames(data)
+# rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
+# print(rp_genes)
+# 
+# data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
+# 
+# #Add new column with mitochondrial percentage information
+# data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
+```
+
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#Save RDS with mitochondrial and ribosomal percentages
+#saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
+```
+
+```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+data <- readRDS("../RDS/data_combined_raw_umap.RDS")
+cat("##", "Mitochondrial", " \n")
+DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
+VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+cat(" \n \n")
+```
+
+
+
+```{r, eval = FALSE, echo=FALSE}
+# Plot and save integrated umap
+# pdf(paste("../pdfs/non_integrated_mitochondrial_pct.pdf"), width=16, height=10, useDingbats = FALSE)
+# DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
+# VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+# dev.off()
+```
+
+
+
+```{r, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#Filter out cells with >20% mitochondrial gene exp
+#data_filtered <- subset(data, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+data <- readRDS("../RDS/data_combined_raw_umap.RDS")
+
+# Get total and filtered cell counts 
+total_cells <- length(Cells(data))
+retained_cells <- length(Cells(data_filtered))
+filtered_cells <- total_cells - retained_cells  # Ensures correct total filtered count
+
+# Calculate percentages
+retained_percentage <- (retained_cells / total_cells) * 100
+filtered_percentage <- (filtered_cells / total_cells) * 100
+
+# Count cells with NA values in filtering columns
+na_filtered <- sum(is.na(data$nFeature_RNA) | is.na(data$percent.mt))
+
+# Count cells removed due to BOTH filters (overlap)
+overlap_filtered <- sum((data$nFeature_RNA < 200 | data$nFeature_RNA > 2500) & (data$percent.mt > 20), na.rm = TRUE)
+
+# Directly count cells removed for nFeature_RNA and percent.mt, adjusting for overlap
+nfeature_count <- sum(data$nFeature_RNA < 200 | data$nFeature_RNA > 2500, na.rm = TRUE) 
+mitochondrial_cells <- sum(data$percent.mt > 20, na.rm = TRUE)
+
+# Correct the total filtered count by adding NAs
+filtered_cells_corrected <- nfeature_count + mitochondrial_cells - overlap_filtered + na_filtered
+
+# Format a clean summary table
+summary_table <- data.frame(
+  "Category" = c("Total Cells", "Retained Cells", "Total Filtered Cells", "nFeature_RNA Cells", "Mitochondrial Cells"),
+  "Raw Count" = c(total_cells, retained_cells, filtered_cells, nfeature_count, mitochondrial_cells),
+  "Percentage" = c(
+    100, 
+    retained_percentage, 
+    (filtered_cells / total_cells) * 100, 
+    (nfeature_count / total_cells) * 100, 
+    (mitochondrial_cells / total_cells) * 100
+  )
+)
+
+# Format to remove scientific notation
+summary_table$Percentage <- format(summary_table$Percentage, scientific = FALSE)
+```
+
+# `r colorize('Cell Count Summary', 'blue')`
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display the summary table
+paged_table(summary_table)
+```
+
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#Save RDS post filtering
+#saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
+```
+
+
+# `r colorize("Non-integrated 44 immune samples (HIV and control), after Mitochondrial and nFeature RNA Filtering", "blue")` {.tabset}
+
+```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+
+cat("##", "Samples", " \n")
+DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering") + theme(legend.position = "none")
+cat(" \n \n")
+cat("##", "Condition", " \n")
+DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering")
+cat(" \n \n")
+
+```
+
+
+# `r colorize('Doublet Detection', 'blue')`
+
+```{r, eval=FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#Doublet detection using scDblfinder)
+# data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+# DefaultAssay(data_filtered) <- "RNA"
+# set.seed(100)
+# 
+# sce <- data_filtered
+# sce <- sce %<>% JoinLayers() %>% as.SingleCellExperiment() #Since there are multiple layers and sce needs to be 1
+# #data_filtered[["RNA"]] <- as(data_filtered[["RNA"]], Class="Assay")
+# #sce <- as.SingleCellExperiment(data_filtered, layer = "counts")
+# sce <- scDblFinder(sce)
+# table(sce$scDblFinder.class)
+# sce@colData@listData %>% as.data.frame() %>% head()
+```
+
+```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
+#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
+# head(meta_scdblfinder)
+# 
+# # Explore results and add to seurat object
+# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
+#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
+# head(meta_scdblfinder)
+# rownames(meta_scdblfinder) <- sce@colData@rownames
+# head(meta_scdblfinder)
+# data_filtered<- AddMetaData(object = data_filtered, metadata = meta_scdblfinder %>% dplyr::select('scDblFinder.class'))
+```
+
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#Save RDS with doublet information
+#saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+#data <- readRDS("../RDS/data_combined_raw_umap.RDS)
+
+# Get the total number of cells in the dataset
+total_cells <- length(Cells(data_filtered))
+
+# Get the count of cells retained after filtering
+singlet_count <- sum(data_filtered$scDblFinder.class == "singlet")
+
+# Calculate the number of mitochondrial cells 
+doublet_count <- sum(data_filtered$scDblFinder.class == "doublet")
+
+# Calculate percentages
+singlet_percentage <- (singlet_count / total_cells) * 100
+doublet_percentage <- (doublet_count / total_cells) * 100
+
+# Create a summary table
+doublet_summary <- data.frame(
+  "Category" = c("Total Cells", "Singlet Cells", "Doublet Cells"),
+  "Raw Count" = c(total_cells, singlet_count, doublet_count),
+  "Percentage" = c(100, singlet_percentage, doublet_percentage)
+)
+```
+
+## Doublet Count Summary {.tabset}
+
+After mitchondrial >20%  and nFeature_RNA (<200 OR >2500) filtering.
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display the summary table
+cat("###", "Doublet Summary", " \n")
+paged_table(doublet_summary)
+cat(" \n \n")
+# Visualize with the annotated cell types
+cat("###", "Doublet Dimplot", " \n")
+DimPlot(data_filtered, reduction = "umap", group.by="scDblFinder.class") + ggtitle("Doublet Distribution")
+cat(" \n \n")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# seu_dblt <- subset(data.combined,scDblFinder.class == 'singlet')
+```
+
+
+# `r colorize('Cell Count Distribution', 'blue')` {.tabset}
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Load filtered dataset
+#data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+
+# Count number of cells per sample
+cell_counts <- table(data_filtered$sample_names)
+
+# Convert to data frame
+df_counts <- as.data.frame(cell_counts)
+colnames(df_counts) <- c("Sample", "Cell_Count")
+
+# Calculate percentage distribution (ensuring it sums to 100)
+df_counts$Percentage <- (df_counts$Cell_Count / sum(df_counts$Cell_Count)) * 100
+
+# Bar plot for percentage distribution with y-axis fixed from 0 to 100
+p1 <- ggplot(df_counts, aes(x = Sample, y = Percentage, fill = Sample)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "Cell Percentage Distribution Across Samples",
+    x = "Sample",
+    y = "Percentage of Total Cells",
+    fill = "Sample"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+# Bar plot for raw counts
+p2 <- ggplot(df_counts, aes(x = Sample, y = Cell_Count, fill = Sample)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(
+    title = "Raw Cell Count Distribution Across Samples",
+    x = "Sample",
+    y = "Number of Cells",
+    fill = "Sample"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+```
+
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+cat("##", "Raw Count Distribution", " \n")
+print(p2)
+cat ('\n \n')
+cat("##", "Percentage Distribution", " \n")
+print(p1)
+cat ('\n \n')
+```
