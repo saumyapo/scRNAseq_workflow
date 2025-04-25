@@ -1,1 +1,1 @@
-# sc-RNAseq_Seurat_workflow
+# Single cell RNA-seq Seurat Workflow
