@@ -242,6 +242,7 @@ datatable(
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
 ### Top 20 Markers (avg_log2FC)
+
 ```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
@@ -314,81 +315,40 @@ subset_data$cluster_label <- plyr::mapvalues(
 
 # Update the identities in the Seurat object
 Idents(subset_data) <- myeloid_subset$cluster_label
-# 
-# saveRDS(subset_data, "../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
+ 
+saveRDS(subset_data, "../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
 ```
 
+# Annotated subset clusters
 
-```{r, eval=FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Doublet detection using scDblfinder)
-# myeloid_subset <- readRDS("../RDS/data_myeloid_umap_12_clusters.RDS")
-# DefaultAssay(myeloid_subset) <- "RNA"
-# set.seed(100)
-# 
-# sce <- myeloid_subset
-# sce <- sce %<>% JoinLayers() %>% as.SingleCellExperiment() #Since there are multiple layers and sce needs to be 1
-# sce <- scDblFinder(sce)
-# table(sce$scDblFinder.class)
-# sce@colData@listData %>% as.data.frame() %>% head()
-```
-
-```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# 
-# # Explore results and add to seurat object
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# rownames(meta_scdblfinder) <- sce@colData@rownames
-# head(meta_scdblfinder)
-# myeloid_subset<- AddMetaData(object = myeloid_subset, metadata = meta_scdblfinder %>% dplyr::select('scDblFinder.class'))
-```
-
-<!-- ## Doublet Count Summary {.tabset} -->
-
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
-# Display the summary table
-# cat("###", "Doublet Summary", " \n")
-# paged_table(doublet_summary)
-# cat(" \n \n")
-# Visualize with the annotated cell types
-# cat("###", "Doublet Dimplot", " \n")
-# DimPlot(myeloid_subset, reduction = "umap", group.by="scDblFinder.class") + ggtitle("Doublet Distribution")
-# cat(" \n \n")
-```
-
-
-# `r colorize('Annotated myeloid clusters', 'blue')`
-
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
-myeloid_subset <- readRDS("../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
-Idents(myeloid_subset) <- "cluster_label"
+```{r,results='asis', message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+subset_data <- readRDS("../RDS/subset_umap_12_clusters.RDS")
+Idents(subset_data) <- "cluster_label"
 # Check clustering UMAP
-DimPlot(myeloid_subset, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
-
-#ElbowPlot(myeloid_subset, ndims = 50)
+DimPlot(subset_data, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
 ```
 
-# `r colorize('Condition Wise DEGs (HIV vs Control)', 'blue')`
+# Condition Wise DEGs
 
 ```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # Find All Markers
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
-# DefaultAssay(myeloid_subset) <- "RNA"
-# Idents(myeloid_subset) <- "condition"
-# myeloid_subset <- JoinLayers(myeloid_subset)
-# data.markers <- FindAllMarkers(myeloid_subset, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-# data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
-# # Save markers
-# write.csv(data.markers, file='../csvs/myeloid_V2/data_myeloid_all_markers_condition.csv')
+# Find All Markers
+subset_data <- readRDS("../RDS/subset_umap_12_clusters.RDS")
+DefaultAssay(subset_data) <- "RNA"
+Idents(subset_data) <- "condition"
+
+subset_data <- JoinLayers(subset_data)
+
+data.markers <- FindAllMarkers(subset_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
+
+# Save markers
+write.csv(data.markers, file='../csvs/subset_all_markers_condition.csv')
 ```
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = FALSE, message=FALSE, warning=FALSE}
 # Read Markers .csv
-data.markers = read.csv('../csvs/myeloid_V2/data_myeloid_all_markers_condition.csv')
+data.markers = read.csv('../csvs/subset_all_markers_condition.csv')
 data.markers$pct.diff = data.markers$pct.1 - data.markers$pct.2
 data.markers$pct.ratio = data.markers$pct.1 / data.markers$pct.2
 avglog_p = data.markers %>% group_by(cluster) %>% slice_max(n = 20, order_by = avg_log2FC)
@@ -400,33 +360,27 @@ pctratio_n = data.markers %>% group_by(cluster) %>% slice_min(n = 20, order_by =
 ```
 
 
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
 
-positive.markers = read.csv('../csvs/myeloid_V2/data_myeloid_all_markers_condition.csv')
+positive.markers = read.csv('../csvs/subset_pos_markers_condition.csv')
 
 positive.markers$pct.diff = positive.markers$pct.1 - positive.markers$pct.2
 positive.markers$pct.ratio = positive.markers$pct.1 / positive.markers$pct.2
 
 # Keep positive markers only
 positive.markers <- positive.markers[positive.markers$pct.diff > 0.0,]
-
 positive.markers = positive.markers %>% group_by(cluster) %>% slice_max(n = 200, order_by = pct.diff)
 
-
-write.csv(positive.markers, file='../csvs/myeloid_V2/data_myeloid_pos_markers_condition.csv')
-
-```
-
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-paged_table(positive.markers)
+write.csv(positive.markers, file='../csvs/subset_pos_markers_condition.csv')
 ```
 
 ## Positive markers {.tabset}
+
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
 ### Top 20 Markers (avg_log2FC)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   avglog_p, 
@@ -440,7 +394,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pctdiff)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctdiff_p, 
   extensions = 'Buttons', 
@@ -453,7 +408,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pct.ratio)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctratio_p, 
   extensions = 'Buttons', 
@@ -468,7 +424,8 @@ datatable(
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
 ### Top 20 Markers (avg_log2FC)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   avglog_n, 
@@ -482,7 +439,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pctdiff)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctdiff_n, 
   extensions = 'Buttons', 
@@ -495,7 +453,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pct.ratio)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctratio_n, 
   extensions = 'Buttons', 
@@ -508,9 +467,10 @@ datatable(
 
 
 ## All markers
+
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   data.markers, 
@@ -522,164 +482,56 @@ datatable(
 )
 ```
 
+```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
+# Code block to find condition wise markers for each subcluster of subsetted data
 
-# `r colorize('Annotated myeloid clusters after filtering', 'blue')`
-
-T Cells and Cluster 11 which came from only one patient
-
-```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
-# Idents(myeloid_subset) <- "seurat_clusters"
-# filt_myeloid_subset <- subset(myeloid_subset, idents = c("9", "11"), invert = TRUE)
-# saveRDS(filt_myeloid_subset, "../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-```
-
-```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-# Idents(myeloid_subset) <- "seurat_clusters"
-# 
-# cluster_annotations <- c("0" = "0",
-#                          "1" = "1",
-#                          "2" = "2",
-#                          "3" = "3",
-#                          "4" = "4",
-#                          "5" = "5",
-#                          "6" = "6",
-#                          "7" = "7",
-#                          "8" = "8",
-#                          "10" = "9")
-# 
-# 
-# 
-# #Apply the new annotations to your Seurat object
-# myeloid_subset$seurat_clusters <- plyr::mapvalues(
-#   Idents(myeloid_subset),
-#    from = names(cluster_annotations),
-#   to = cluster_annotations
-# )
-# 
-# #Update the identities in the Seurat object
-# Idents(myeloid_subset) <- myeloid_subset$cluster_label
-# 
-# saveRDS(myeloid_subset, "../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-```
-
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
-myeloid_subset <- readRDS("../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-Idents(myeloid_subset) <- "cluster_label"
-# Check clustering UMAP
-DimPlot(myeloid_subset, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
-
-#ElbowPlot(myeloid_subset, ndims = 50)
-```
-
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # Find All Markers
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-# DefaultAssay(myeloid_subset) <- "RNA"
-# Idents(myeloid_subset) <- "condition"
-# myeloid_subset <- JoinLayers(myeloid_subset)
-# data.markers <- FindAllMarkers(myeloid_subset, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-# data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
-# # Save markers
-# write.csv(data.markers, file='../csvs/myeloid_V2/condition/myeloid_all_markers_condition.csv')
-```
-
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-
-# positive.markers = read.csv('../csvs/myeloid_V2/condition/myeloid_all_markers_condition.csv')
-# 
-# positive.markers$pct.diff = positive.markers$pct.1 - positive.markers$pct.2
-# positive.markers$pct.ratio = positive.markers$pct.1 / positive.markers$pct.2
-# 
-# # Keep positive markers only
-# positive.markers <- positive.markers[positive.markers$pct.diff > 0.0,]
-# 
-# positive.markers = positive.markers %>% group_by(cluster) %>% slice_max(n = 200, order_by = pct.diff)
-# 
-# 
-# write.csv(positive.markers,file='../csvs/myeloid_V2/condition/data_myeloid_pos_markers_condition.csv')
-
-```
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Find All Markers
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-# DefaultAssay(myeloid_subset) <- "RNA"
-# Idents(myeloid_subset) <- "seurat_clusters"
-# myeloid_subset <- JoinLayers(myeloid_subset)
-# data.markers <- FindAllMarkers(myeloid_subset, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-# data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
-# # Save markers
-# write.csv(data.markers, file='../csvs/myeloid_V2/data_myeloid_all_markers_10_clusters.csv')
-```
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-
-# positive.markers = read.csv('../csvs/myeloid_V2/data_myeloid_all_markers_10_clusters.csv')
-# 
-# positive.markers$pct.diff = positive.markers$pct.1 - positive.markers$pct.2
-# positive.markers$pct.ratio = positive.markers$pct.1 / positive.markers$pct.2
-# 
-# # Keep positive markers only
-# positive.markers <- positive.markers[positive.markers$pct.diff > 0.0,]
-# 
-# positive.markers = positive.markers %>% group_by(cluster) %>% slice_max(n = 200, order_by = pct.diff)
-# 
-# 
-# write.csv(positive.markers, file='../csvs/myeloid_V2/data_myeloid_pos_markers_10_clusters.csv')
-
-```
-
-```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # Read Seurat object
-# myeloid_subset <- readRDS("../RDS/myeloid_V2/filt_myeloid_umap_10_clusters.RDS")
-# 
-# # Ensure RNA assay is set
-# DefaultAssay(myeloid_subset) <- "RNA"
-# Idents(myeloid_subset) <- "seurat_clusters"
-# 
-# # Store subcluster identities (backup)
-# myeloid_subset$subcluster <- Idents(myeloid_subset)
-# 
-# # Set condition as active identity
-# Idents(myeloid_subset) <- "condition"
-# myeloid_subset <- JoinLayers(myeloid_subset)
-# # Create an empty list to store results
-# markers_list <- list()
-# 
-# # Loop over each subcluster
-# for (cluster in unique(myeloid_subset$subcluster)) {
-#   #Subset data for the current subcluster
-#   if (as.numeric(as.character(cluster)) == 11) {
-#     next #Since cluster 11 comes from onyl one sample
-#   }
-# 
-#   print (cluster)
-#   subcluster_data <- subset(myeloid_subset, subset = subcluster == cluster)
-# 
-#   # Set condition as active identity
-#   Idents(subcluster_data) <- "condition"
-# 
-#   # Find all markers between HIV and Control within this subcluster
-#   markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.1, logfc.threshold = 0)
-#   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
-#   # Store results with subcluster name
-#   markers_list[[paste0("myeloid_subcluster_", cluster)]] <- markers
-# }
-# 
-# # Save results to CSV
-# for (name in names(markers_list)) {
-#   write.csv(markers_list[[name]], file=paste0("../csvs/myeloid_V2/condition/", name, "_HIV_vs_Control.csv"))
-# }
+subset_data <- readRDS("../RDS/subset_umap_10_clusters.RDS")
+
+# Ensure RNA assay is set
+DefaultAssay(subset_data) <- "RNA"
+Idents(subset_data) <- "seurat_clusters"
+
+# Store subcluster identities (backup)
+subset_data$subcluster <- Idents(subset_data)
+
+# Set condition as active identity
+Idents(subset_data) <- "condition"
+
+subset_data <- JoinLayers(subset_data)
+
+# Create an empty list to store results
+markers_list <- list()
+
+# Loop over each subcluster
+for (cluster in unique(subset_data$subcluster)) {
+  # Subset data for the current subcluster
+   message("Processing Cluster: ", cluster)
+   subcluster_data <- subset(subset_data, subset = subcluster == cluster)
+ 
+  # Set condition as active identity
+  Idents(subcluster_data) <- "condition"
+
+  # Find all markers between Condition and Control within this subcluster
+  markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
+
+  # Store results with subcluster name
+   markers_list[[paste0("subset_subcluster_", cluster)]] <- markers
+}
+
+# Save results to CSV
+for (name in names(markers_list)) {
+  write.csv(markers_list[[name]], file=paste0("../csvs/subset/condition/", name, "_Condition_vs_Control.csv"))
+}
 ```
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Calculating significant number of DEGs in each subcluster based on above generated files. Using p_val_adj < 0.05 and abs(avg_log2FC) > 1 to count a gene as significant
+
 # Get list of all subcluster DEG files
-subcluster_files <- list.files("../csvs/myeloid_V2/condition/", pattern = "^myeloid_", full.names = TRUE)
+subcluster_files <- list.files("../csvs/subset/condition/", pattern = "_Condition_vs_Control.csv", full.names = TRUE)
 
 # Initialize empty data frame to store counts
 deg_summary <- data.frame(Subcluster = character(), Num_Sig_DEGs = numeric(), stringsAsFactors = FALSE)
@@ -694,17 +546,17 @@ for (file in subcluster_files) {
   filter(!grepl("^MT", gene) & !grepl("^RB[SL]", gene))  # Exclude mitochondrial and ribosomal genes
   
   # Extract subcluster name from file name
-  subcluster_name <- gsub("../csvs/myeloid_V2/condition/|_HIV_vs_Control.csv", "", file)
+  subcluster_name <- gsub("../csvs/subset/condition/|_Condition_vs_Control.csv", "", file)
   
   # Store result
   deg_summary <- rbind(deg_summary, data.frame(Subcluster = subcluster_name, Num_Sig_DEGs = nrow(sig_degs)))
 }
 
 # Save summary to CSV
-#write.csv(deg_summary, "../csvs/DEG_Summary.csv", row.names = FALSE)
+write.csv(deg_summary, "../csvs/DEG_Summary.csv", row.names = FALSE)
 ```
 
-# `r colorize('Number of significant DEGs (HIV vs Control) in each subcluster', 'blue')` {.tabset}
+# Number of significant DEGs (Condition vs Control) in each subcluster {.tabset}
 
 - p_val_adj < 0.05, and abs(log2fc) > 1
 
@@ -713,33 +565,34 @@ for (file in subcluster_files) {
 
 *p_val_adj was calculated using FDR instead of default BH which causes inflated values.
 
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results='asis', message=FALSE, warning=FALSE}
 # Print summary
 paged_table(deg_summary)
 ```
 
-# `r colorize('Volcano plot for DEGs for all subclusters', 'blue')` {.tabset}
+# Volcano plot for DEGs for all subclusters {.tabset}
 
 Not plotting mitochondrial and ribosomal genes. Present in the data but not including them as genes of interest.
 
-abs(log2fc) > 0.25, p_val_adj < 0.05
+Highlighting genes which are: abs(log2fc) > 0.25, p_val_adj < 0.05
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r,results='asis', message=FALSE, warning=FALSE}
+# Code generates volcano plots for DEGs of interest. Input here is the previously generated condition files for each subcluster
+
 library(ggplot2)
 library(ggrepel)
 
 # List of CSV files for each subcluster
-csv_files <-  list.files("../csvs/myeloid_V2/condition/", pattern = "^myeloid_", full.names = TRUE)
+csv_files <-  list.files("../csvs/subset/condition/", pattern = "_Condition_vs_Control.csv", full.names = TRUE)
 
 # Function to generate volcano plot
 volcanoplot <- function(de, subcluster_name) {
-  # List of oligo types
-  types <- c("HIV")
   
   # Filter out mitochondrial and ribosomal genes
   de <- de %>% filter(!grepl("^MT", gene) & !grepl("^RB[SL]", gene))
-  
-  de<- subset(de, cluster=="HIV")
+
+  # Subset input data for only condition
+  de<- subset(de, cluster=="Condition")
   
   de$diffexpressed <- "NO"
   de$diffexpressed[de$avg_log2FC < -0.25 & de$p_val < 0.05] <- "DOWN"
@@ -765,9 +618,9 @@ volcanoplot <- function(de, subcluster_name) {
     geom_text_repel(min.segment.length = 0, size = 2, max.overlaps = Inf, show.legend = FALSE) +
     scale_color_manual(values = c("DOWN" = "black", "UP" = "black")) +
     guides(color = guide_legend(title = NULL)) +
-    labs(x = expression("Upregulated in CONTROL <- avg log"[2]*"FC -> Upregulated in HIV"), 
+    labs(x = expression("Upregulated in CONTROL <- avg log"[2]*"FC -> Upregulated in Condition"), 
          y = expression("-log"[10]*"p-value"),
-         title = paste0("DEGs in ", subcluster_name, " HIV vs CONTROL")) +
+         title = paste0("DEGs in ", subcluster_name, " Condition vs CONTROL")) +
     theme_bw() +
     theme(plot.title = element_text(hjust = 0.5), axis.text = element_text(size = 16))
 }
@@ -777,10 +630,10 @@ volcano_plots <- list()
 
 # Loop through each CSV file, generate plots, and store them
 for (file in csv_files) {
-  if (grepl("myeloid_subcluster_\\d+_HIV_vs_Control.csv", file)) {
-    subcluster_name <- gsub(".*myeloid_subcluster_(\\d+)_HIV_vs_Control.csv", "Subcluster \\1", file)
-  } else if (grepl("myeloid_all_markers_condition.csv", file)) {
-    subcluster_name <- "Myeloid (Overall)"
+  if (grepl("subset_subcluster_\\d+_Condition_vs_Control.csv", file)) {
+    subcluster_name <- gsub(".*subset_subcluster_(\\d+)_Condition_vs_Control.csv", "Subcluster \\1", file)
+  } else if (grepl("subset_all_markers_condition.csv", file)) {
+    subcluster_name <- "Subset (Overall)"
   } else {
     subcluster_name <- "Unknown"
   }
@@ -800,31 +653,3 @@ for (name in names(volcano_plots)) {
 
 ```
 
-<!-- ```{r, echo=FALSE, message=FALSE, warning=FALSE} -->
-<!-- # Extract raw counts for the neutrophil cluster (cluster 5) -->
-<!-- #myeloid_subset <- readRDS("../RDS/data_myeloid_umap_19_clusters.RDS") -->
-
-<!-- treg_cells <- WhichCells(myeloid_subset, ident = "Tregs") -->
-
-<!-- # Get the raw count of neutrophil cells -->
-<!-- treg_count <- length(treg_cells) -->
-
-<!-- # Get the total number of cells in the dataset -->
-<!-- total_cells <- length(Cells(myeloid_subset)) -->
-
-<!-- # Calculate the percentage of neutrophils in the dataset -->
-<!-- treg_percentage <- (treg_count / total_cells) * 100 -->
-
-<!-- # Create a summary table -->
-<!-- summary_table <- data.frame( -->
-<!--   "Cell Type" = c("Tregs", "Total Cells"), -->
-<!--   "Raw Count" = c(treg_count, total_cells), -->
-<!--   "Percentage" = c(treg_percentage, 100) -->
-<!-- ) -->
-<!-- ``` -->
-
-<!-- # Cell Count for Tregs {.tabset} -->
-<!-- ```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE} -->
-<!-- # Display the summary table -->
-<!-- paged_table(summary_table) -->
-<!-- ``` -->
