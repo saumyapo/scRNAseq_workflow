@@ -1,48 +1,22 @@
 ---
-title: "Immune 44 Samples HIV vs Control"
+title: "Non-integrated samples"
 author: "Saumya"
 date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true # Adds numbers to headers
+    css: styles.css
+    code_folding: hide
 ---
 
-```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Markdown parameters
-set_echo = FALSE
-set_eval = FALSE
-```
 
-```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Function to set markdown text color
-colorize <- function(x, color) {
-  if (knitr::is_latex_output()) {
-    sprintf("\\textcolor{%s}{%s}", color, x)
-  } else if (knitr::is_html_output()) {
-    sprintf("<span style='color: %s;'>%s</span>", color,
-      x)
-  } else x
-}
-```
-
-
-```{r, include=FALSE}
-# Set height of chunk output
-options(width = 60)
-local({
-  hook_output <- knitr::knit_hooks$get('output')
-  knitr::knit_hooks$set(output = function(x, options) {
-    if (!is.null(options$max.height)) options$attr.output <- c(
-      options$attr.output,
-      sprintf('style="max-height: %s;"', options$max.height)
-    )
-    hook_output(x, options)
-  })
-})
-```
-
-```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
-# Load packages
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Load required packages
 library(dplyr)
 library(Seurat)
 library(patchwork)
@@ -59,9 +33,9 @@ library(hdf5r)
 ```
 
 <!-- Information of Used Library -->
-### `r colorize('Information of Used R Libraries', 'blue')` 
+## Information of Used R Libraries
 
-The following R libraries were used to process the data and produce this report.
+The following R libraries were used to process the data and produce this report:
 
 R: `r R.Version()$version.string`,
 
@@ -77,183 +51,134 @@ cowplot: `r packageVersion('cowplot')`,
 
 scDblFinder: `r packageVersion('scDblFinder')`
 
-```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
-suffix <- "Seurat"
-sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
-
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+sampleNames <- c("ABC", "XYZ", "LMN")
 data_dir <- ("../../raw_h5")
-projectName <- "Immune HIV vs Control"
+projectName <- "Seurat"
 h5_string <- "_filtered_feature_bc_matrix.h5"
-
-#Seurat parameters
-variables.features <- 2000
-nPCs <- 50
 ```
 
-```{r,  eval=FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
-# # Define filenames and sample names for both IBDU013
-# filenames <- c(file.path(data_dir, paste0(sampleNames, h5_string)))
-# filenames
-# # Create a list to store Seurat objects
-# seurat_list <- list()
-# 
-# # Loop through filenames and create Seurat objects
-# for (i in 1:length(filenames)) {
-#   raw_data <- Read10X_h5(filenames[i], use.names = TRUE, unique.features = TRUE)
-#   seurat_obj <- CreateSeuratObject(counts = raw_data,
-#                                    project = "Combined_HIV_Immune",
-#                                    min.cells = 3,
-#                                    min.features = 200)
-#   # Add sample name to orig.ident
-#   seurat_obj$orig.ident <- sampleNames[i]
-# 
-#   # Store in the list
-#   seurat_list[[i]] <- seurat_obj
-# }
-# 
-# # Merge all Seurat objects into one
-# combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
-# 
-# combined_data@meta.data$sample_names <- combined_data@meta.data$orig.ident
-# 
-# #Save the combined Seurat object
-# saveRDS(combined_data, file = "../RDS/data_combined_raw.RDS")
+```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+# Define filenames and path
+filenames <- c(file.path(data_dir, paste0(sampleNames, h5_string)))
+
+# Check if the path for the files is right
+filenames
+
+# Create a list to store Seurat objects
+seurat_list <- list()
+ 
+# Loop through filenames and create Seurat objects
+for (i in 1:length(filenames)) {
+  raw_data <- Read10X_h5(filenames[i], use.names = TRUE, unique.features = TRUE)
+  seurat_obj <- CreateSeuratObject(counts = raw_data,
+                                    project = projectName,
+                                   min.cells = 3,
+                                   min.features = 200)
+# Add sample name to orig.ident
+ seurat_obj$orig.ident <- sampleNames[i]
+
+# Store in the list
+ seurat_list[[i]] <- seurat_obj
+}
+ 
+# Merge all Seurat objects into one
+combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
+ 
+combined_data@meta.data$sample_names <- combined_data@meta.data$orig.ident
+
+# Save the combined Seurat object
+saveRDS(combined_data, file = "../RDS/data_combined_raw.RDS")
 ```
 
+```{r, eval= FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Add condition information based on sample names
+data <- readRDS("../RDS/data_combined_raw.RDS")
 
-```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
-# df <- data.frame (
-#   Sample = sampleNames,
-#   Condition = sample_to_group
-# )
-# print(df)
-```
+sample_to_group <- c("ABC" = "Control",
+                    "XYZ" = "Condition",
+                    "LMN" = "Condition")
 
+# Apply the new annotations to your Seurat object
+data$condition <- plyr::mapvalues(
+  data$sample_names,
+   from = names(sample_to_group),
+  to = sample_to_group
+)
 
-```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # #Add condition information based on sample names
-# data <- readRDS("../RDS/data_combined_raw.RDS")
-# 
-# sample_to_group <- c("DART002LC_BL" = "HIV",
-#                     "DART003LC" = "HIV",
-#                     "DART005LC" = "HIV",
-#                     "DART006LC" = "HIV",
-#                     "DART007LC" = "HIV",
-#                     "HIV018_CA" = "HIV",
-#                     "HIV022_CA" = "HIV",
-#                     "HIV032_CA" = "HIV",
-#                     "HIV058_LP" = "HIV",
-#                     "HIV063_LP" = "HIV",
-#                     "HIV075_LP" = "HIV",
-#                     "HIV076_LP" = "HIV",
-#                     "HIV077_LP" = "HIV",
-#                     "HIV078_LP" = "HIV",
-#                     "HIV080_LP" = "HIV",
-#                     "HIV081_LP" = "HIV",
-#                     "HIV082_LP" = "HIV",
-#                     "HIV083_LC" = "HIV",
-#                     "HIV084_LP" = "HIV",
-#                     "HIV086_LC" = "HIV",
-#                     "HIV087_LP" = "HIV",
-#                     "HIV091_LC" = "HIV",
-#                     "HIV092_LC" = "HIV",
-#                     "HIV093_LC" = "HIV",
-#                     "HIV094_LC" = "HIV",
-#                     "HIV098_LC" = "HIV",
-#                     "NV144_LP" = "Control",
-#                     "NV157_LP_LC" = "Control",
-#                     "NV159_LP_LC" = "Control",
-#                     "NV161_LC" = "Control",
-#                     "NV162_LP_LC" = "Control",
-#                     "NV186_LP" = "Control",
-#                     "NV201_LP" = "Control",
-#                     "NV203_LP" = "Control",
-#                     "NV205_LP" = "Control",
-#                     "NV212_LC" = "Control",
-#                     "NV213_LC" = "Control",
-#                     "NV216_LP" = "Control",
-#                     "NV222_LP" = "Control",
-#                     "NV225_LP" = "Control",
-#                     "NV230_LP" = "Control",
-#                     "NV234_LC" = "Control",
-#                     "NV244_LC" = "Control",
-#                     "NV245_LC" = "Control"
-#                     )
-# 
-# 
-# # Apply the new annotations to your Seurat object
-# data$condition <- plyr::mapvalues(
-#   data$sample_names,
-#   from = names(sample_to_group),
-#   to = sample_to_group
-# )
-# 
-# unique(data$condition)
+# Check if condition has been mapped appropriately
+unique(data$condition)
 ```
 
 
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
 ```
 
 
-```{r, eval = FALSE, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
-# data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
-# data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
-# data <- ScaleData(data, verbose = FALSE)
-# 
-# #dimension reduction
-# data <- RunPCA(data, npcs = 50, verbose = FALSE)
-# data <- RunUMAP(data, reduction = "pca", dims = 1:50)
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Standard Seurat workflow
+
+data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+data <- ScaleData(data, verbose = FALSE)
+
+#dimension reduction
+data <- RunPCA(data, npcs = 50, verbose = FALSE)
+
+# Check how many PCs to use
+ElbowPlot(data, ndims = 50)
+
+# Change number of dims based on ElbowPlot cutoff
+data <- RunUMAP(data, reduction = "pca", dims = 1:50)
 ```
 
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
 ```
 
-# `r colorize("Non-integrated 44 immune samples (HIV and control), before QC", "blue")` {.tabset}
+# Non-integrated Samples before QC {.tabset}
 
-```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = 'asis', message=FALSE, warning=FALSE}
 data <- readRDS("../RDS/data_combined_raw_umap.RDS")
 
 cat("##", "Samples", " \n")
-DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("Before Integration and QC") + theme(legend.position = "none")
+DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("Samples before integration and QC") + theme(legend.position = "none")
 cat(" \n \n")
+
 cat("##", "Condition", " \n")
-DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("Before Integration and QC")
+DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("Condition before integration and QC")
 cat(" \n \n")
 ```
 
 
-# `r colorize("QC: Checking mitochondrial and ribosomal gene percentages", "blue")` {.tabset}
+# QC: Checking mitochondrial and ribosomal gene percentages {.tabset}
 
-There are no ribosomal genes in the dataset.
-Cells with > 20% mitochondrial percentage and nFeature_RNA <200 OR >2500 were filtered. 
+Cells with > 10% mitochondrial percentage and nFeature_RNA <200 OR >2500 are generally filtered. 
 
-Note: nFeature_RNA is the total number of genes detected in each cell. It counts how many genes show a non-zero expression level for a given cell, and <200 is a low quality cell, and >2500 is assumed to be a doublet due to higher than normal expression levels.
+Note: nFeature_RNA is the total number of genes detected in each cell. It counts how many genes show a non-zero expression level for a given cell, and <200 is a low quality cell, and >2500 is assumed to be a doublet due to higher than normal expression levels, but data varies. Make sure to check your data and determine appropriate cutoffs to not lose real biological information.
 
-```{r, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Check mitochondrial gene names
+gene_names <- rownames(data)
+mt_genes <- grep("^MT-", gene_names, value = TRUE)
+print(mt_genes)
 
-# #Check mitochondrial gene names
-# gene_names <- rownames(data)
-# mt_genes <- grep("^MT-", gene_names, value = TRUE)
-# print(mt_genes)
-# 
-# data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
-# 
-# #Add new column with mitochondrial percentage information
-# data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
-# 
-# 
-# #Check ribosomal gene names
-# gene_names <- rownames(data)
-# rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
-# print(rp_genes)
-# 
-# data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
-# 
-# #Add new column with mitochondrial percentage information
-# data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
+data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
+ 
+# Add new column with mitochondrial percentage information
+data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
+ 
+
+# Check ribosomal gene names
+gene_names <- rownames(data)
+rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
+print(rp_genes)
+ 
+data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
+
+# Add new column with mitochondrial percentage information
+data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
 ```
 
 
