@@ -52,129 +52,47 @@ cowplot: `r packageVersion('cowplot')`,
 
 scDblFinder: `r packageVersion('scDblFinder')`
 
-```{r, results = FALSE, echo=set_echo, message=FALSE, warning=FALSE}
-suffix <- "Seurat"
-sampleNames <- c("DART002LC_BL", "DART003LC", "DART005LC", "DART006LC", "DART007LC", "HIV018_CA", "HIV022_CA", "HIV032_CA", "HIV058_LP", "HIV063_LP", "HIV075_LP", "HIV076_LP", "HIV077_LP", "HIV078_LP", "HIV080_LP", "HIV081_LP", "HIV082_LP", "HIV083_LC", "HIV084_LP", "HIV086_LC", "HIV087_LP", "HIV090_LC", "HIV091_LC", "HIV092_LC", "HIV093_LC", "HIV094_LC", "HIV098_LC", "NV144_LP", "NV157_LP_LC", "NV159_LP_LC", "NV161_LC", "NV162_LP_LC", "NV186_LP", "NV201_LP", "NV203_LP", "NV205_LP", "NV212_LC", "NV213_LC", "NV216_LP", "NV222_LP", "NV225_LP", "NV230_LP", "NV234_LC", "NV244_LC", "NV245_LC")
-
-SAMPLE_GROUP <- c("HIV", "HIV", "HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","HIV","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control","Control", "Control", "Control", "Control","Control","Control","Control","Control")
-data_dir <- ("../raw_h5/")
-projectName <- "Immune HIV vs Control"
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+sampleNames <- c("ABC", "XYZ", "LMN")
+data_dir <- ("../../raw_h5")
+projectName <- "Seurat"
 h5_string <- "_filtered_feature_bc_matrix.h5"
-
-#Seurat parameters
-variables.features <- 2000
-nPCs <- 50
 ```
 
-# `r colorize('Clustering for 44 Immune samples ', 'blue')`
+# Clustering for Samples
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
-data.combined <- readRDS("../RDS/data_Integrated_44_umap.RDS")
+```{r,results='asis', message=FALSE, warning=FALSE}
+# UMAP before clustering
+
+data.combined <- readRDS("../RDS/data_Integrated_umap.RDS")
 Idents(data.combined) <- "sample_names"
 DimPlot(data.combined, reduction = "umap") + ggtitle ("Before Clustering") + theme(legend.position = "none")
 ```
 
-```{r, eval = FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+```{r, eval = FALSE, message = FALSE, results= FALSE, warning=FALSE}
 # Do clustering
-# data.combined <- FindNeighbors(data.combined, reduction = "harmony", dims = 1:50)
-# data.combined <- FindClusters(data.combined)
 
-#ncol(data.combined)
+data.combined <- FindNeighbors(data.combined, reduction = "harmony", dims = 1:20)
+data.combined <- FindClusters(data.combined)
 ```
 
-```{r, eval = FALSE, echo=FALSE, message = FALSE, results= FALSE, warning=FALSE}
+```{r, eval = FALSE, message = FALSE, results= FALSE, warning=FALSE}
 # Save clustering data
-#saveRDS(data.combined, file = paste("../RDS/data_44_umap_33_clusters.RDS") )
+saveRDS(data.combined, file = paste("../RDS/data_umap_33_clusters.RDS") )
 ```
 
 ```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
-
-data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
+# UMAP after clustering
+data.combined <- readRDS("../RDS/data_umap_33_clusters.RDS")
 Idents(data.combined) <- "seurat_clusters"
-# Check clustering UMAP
+
+# Clustering UMAP
 DimPlot(data.combined, reduction = "umap", label = TRUE, repel = TRUE, raster=FALSE) + ggtitle("Seurat Clusters")
-
-#ElbowPlot(data.combined, ndims = 50)
 ```
 
+# Clustering Step 2: Find Markers
 
-# `r colorize('Doublet Detection', 'blue')`
-
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Doublet detection using scDblfinder)
-#data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-# DefaultAssay(data.combined) <- "RNA"
-# set.seed(100)
-# 
-# sce <- data.combined
-# sce %<>% JoinLayers() %>% as.SingleCellExperiment() #Since there are multiple layers and sce needs to be 1
-# sce <- scDblFinder(sce)
-# table(sce$scDblFinder.class)
-# sce@colData@listData %>% as.data.frame() %>% head()
-```
-
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# 
-# # Explore results and add to seurat object
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# rownames(meta_scdblfinder) <- sce@colData@rownames
-# head(meta_scdblfinder)
-# data.combined <- AddMetaData(object = data.combined, metadata = meta_scdblfinder %>% dplyr::select('scDblFinder.class'))
-```
-
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Save RDS with doublet information
-#saveRDS(data.combined, file = paste("../RDS/data_44_umap_33_clusters.RDS"))
-```
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-
-# Get the total number of cells in the dataset
-total_cells <- length(Cells(data.combined))
-
-# Get the count of cells retained after filtering
-singlet_count <- sum(data.combined$scDblFinder.class == "singlet")
-
-# Calculate the number of mitochondrial cells 
-doublet_count <- sum(data.combined$scDblFinder.class == "doublet")
-
-# Calculate percentages
-singlet_percentage <- (singlet_count / total_cells) * 100
-doublet_percentage <- (doublet_count / total_cells) * 100
-
-# Create a summary table
-doublet_summary <- data.frame(
-  "Category" = c("Total Cells", "Singlet Cells", "Doublet Cells"),
-  "Raw Count" = c(total_cells, singlet_count, doublet_count),
-  "Percentage" = c(100, singlet_percentage, doublet_percentage)
-)
-```
-
-## Doublet Count Summary {.tabset}
-
-
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
-# Display the summary table
-cat("###", "Doublet Summary", " \n")
-paged_table(doublet_summary)
-cat(" \n \n")
-# Visualize with the annotated cell types
-cat("###", "Doublet Dimplot", " \n")
-DimPlot(data.combined, reduction = "umap", group.by="scDblFinder.class") + ggtitle("Doublet Distribution")
-cat(" \n \n")
-```
-
-
-# `r colorize('Clustering Step 2: Find Markers', 'blue')`
-
-Find markers for every cluster compared to all remaining cells, report both positive and negative ones. You can check the top 20 markers(selected based on the largest values of avg_log2FC or pct.ratio) and also all markers for each cluster on the following data table. The results data frame has the following columns:
+Find markers for every cluster compared to all remaining cells, report both positive and negative ones. Showing the top 20 markers (selected based on the largest values of avg_log2FC or pct.ratio) and also all markers for each cluster on the following data table. The results data frame has the following columns:
 
 * cluster: cluster label.
 * gene: gene name
@@ -185,34 +103,26 @@ Find markers for every cluster compared to all remaining cells, report both posi
 * p_val_adj: Adjusted p value, based on Bonferroni correction using all genes in the dataset.
 * pct.ratio: The ratio between pct.1 and pct.2.
 
-Markers were found after refining (aka sub-clustering and identifying amibuguous cell populations)
 
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Find All Markers
-# data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-# DefaultAssay(data.combined) <- "RNA"
-# Idents(data.combined) <- "seurat_clusters"
-# data.combined <- JoinLayers(data.combined)
-# data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-# # Save markers
-# write.csv(data.markers, file='../csvs/data_44_all_markers_33_clusters.csv')
+```{r, eval = FALSE, message=FALSE, warning=FALSE}
+# Find All Markers for Seurat clusters. Idents can be set to condition/site or any other column as required
+
+data.combined <- readRDS("../RDS/data_umap_33_clusters.RDS")
+DefaultAssay(data.combined) <- "RNA"
+Idents(data.combined) <- "seurat_clusters"
+
+data.combined <- JoinLayers(data.combined)
+
+data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# Save markers
+write.csv(data.markers, file='../csvs/data_all_markers_33_clusters.csv')
 ```
 
 
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # Find All Markers
-# data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-# Idents(data.combined) <- "sample_names"
-# data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0, logfc.threshold = 0)
-# Apply FDR (Benjamini-Hochberg) correction manually
-#data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
-# # Save markers
-# write.csv(data.markers, file='../csvs/data_IBDU013_deg_all_markers_sample.csv')
-```
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = FALSE, message=FALSE, warning=FALSE}
 # Read Markers .csv
-data.markers = read.csv('../csvs/data_44_all_markers_33_clusters.csv')
+data.markers = read.csv('../csvs/data_all_markers_33_clusters.csv')
 data.markers$pct.diff = data.markers$pct.1 - data.markers$pct.2
 data.markers$pct.ratio = data.markers$pct.1 / data.markers$pct.2
 avglog_p = data.markers %>% group_by(cluster) %>% slice_max(n = 20, order_by = avg_log2FC)
@@ -224,36 +134,26 @@ pctratio_n = data.markers %>% group_by(cluster) %>% slice_min(n = 20, order_by =
 ```
 
 
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-
-positive.markers = read.csv('../csvs/data_44_all_markers_33_clusters.csv')
-
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Store only positive markers in a separate csv file
+positive.markers = read.csv('../csvs/data_all_markers_33_clusters.csv')
 positive.markers$pct.diff = positive.markers$pct.1 - positive.markers$pct.2
 positive.markers$pct.ratio = positive.markers$pct.1 / positive.markers$pct.2
 
 # Keep positive markers only
 positive.markers <- positive.markers[positive.markers$pct.diff > 0.0,]
-
 positive.markers = positive.markers %>% group_by(cluster) %>% slice_max(n = 200, order_by = pct.diff)
 
-
-write.csv(positive.markers, file='../csvs/data_44_pos_markers_33_clusters.csv')
-
+write.csv(positive.markers, file='../csvs/data_pos_markers_33_clusters.csv')
 ```
-
-
-
-```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#paged_table(positive.markers)
-```
-
-
 
 ## Positive markers {.tabset}
+
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
 ### Top 20 Markers (avg_log2FC)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   avglog_p, 
@@ -261,13 +161,14 @@ datatable(
   options = list(
     dom = 'Bfrtip',
     buttons = list('csv'),
-    filter = "top"  # Ensures a search box appears
+    filter = "top"  
   )
 )
 ```
 
 ### Top 20 Markers (pctdiff)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctdiff_p, 
   extensions = 'Buttons', 
@@ -280,7 +181,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pct.ratio)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctratio_p, 
   extensions = 'Buttons', 
@@ -293,10 +195,12 @@ datatable(
 
 
 ## Negative markers {.tabset}
+
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
 ### Top 20 Markers (avg_log2FC)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   avglog_n, 
@@ -304,13 +208,14 @@ datatable(
   options = list(
     dom = 'Bfrtip',
     buttons = list('csv'),
-    filter = "top"  # Ensures a search box appears
+    filter = "top"  
   )
 )
 ```
 
 ### Top 20 Markers (pctdiff)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctdiff_n, 
   extensions = 'Buttons', 
@@ -323,7 +228,8 @@ datatable(
 ```
 
 ### Top 20 Markers (pct.ratio)
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+
+```{r,results='asis', message=FALSE, warning=FALSE}
 datatable(
   pctratio_n, 
   extensions = 'Buttons', 
@@ -335,9 +241,10 @@ datatable(
 ```
 
 ## All markers
+
 While downloading tables please make sure to change filename, otherwise it might overwrite if downloading multiple tables. Make sure to include ".csv" after changing filename to retain format.
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Create a table with a CSV download option
 datatable(
   data.markers, 
@@ -350,62 +257,32 @@ datatable(
 ```
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
-# 
-# cluster_annotations <- c("0" = "Plasma cells",
-#                          "1" = "Plasma cells",
-#                          "2" = "T cells",
-#                          "3" = "T cells",
-#                          "4" = "Mast cells",
-#                          "5" = "B cells",
-#                          "6" = "T cells",
-#                          "7" = "Stroma",
-#                          "8" = "Endothelial cells",
-#                          "9" = "Enterocytes",
-#                          "10" = "T cells",
-#                          "11" = "Plasma cells",
-#                          "12" = "Stroma",
-#                          "13" = "Glial cells",
-#                          "14" = "classic monocytes",
-#                          "15" = "Macrophages",
-#                          "16" = "Plasma cells",
-#                          "17" = "Plasma cells",
-#                          "18" = "Stroma",
-#                          "19" = "classic monocytes",
-#                          "20" = "T cells",
-#                          "21" = "Endothelial cells",
-#                          "22" = "Pericytes",
-#                          "23" = "Proliferating",
-#                          "24" = "Plasma cells",
-#                          "25" = "ILC",
-#                          "26" = "Mast/Plasma cells",
-#                          "27" = "Plasma cells",
-#                          "28" = "Goblet cells",
-#                          "29" = "T cells",
-#                          "30" = "Mast cells",
-#                          "31" = "Tuft cells",
-#                          "32" = "B cells")
-# 
-# #Apply the new annotations to your Seurat object
-# data.combined$cluster_label <- plyr::mapvalues(
-#   Idents(data.combined),
-#    from = names(cluster_annotations),
-#   to = cluster_annotations
-# )
-# 
-# #Update the identities in the Seurat object
-# Idents(data.combined) <- data.combined$cluster_label
-# 
-# saveRDS(data.combined, "../RDS/data_44_umap_33_clusters.RDS")
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+data.combined <- readRDS("../RDS/data_umap_33_clusters.RDS")
+
+# Annotate all clusters appropriately
+cluster_annotations <- c("0" = "Plasma cells",
+                         "1" = "Plasma cells")
+
+# Apply the new annotations to your Seurat object
+data.combined$cluster_label <- plyr::mapvalues(
+ Idents(data.combined),
+    from = names(cluster_annotations),
+  to = cluster_annotations
+)
+
+# Update the identities in the Seurat object
+Idents(data.combined) <- data.combined$cluster_label
+ 
+saveRDS(data.combined, "../RDS/data_umap_33_clusters.RDS")
 ```
 
 
-# `r colorize('Cell Count Distribution in Clusters', 'blue')` {.tabset}
+# Cell Count Distribution in Clusters {.tabset}
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Load filtered dataset
-data.combined <- readRDS("../RDS/data_44_umap_33_clusters.RDS")
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Calculate cell count distribution cluster wise
+data.combined <- readRDS("../RDS/data_umap_33_clusters.RDS")
 
 # Count number of cells per sample
 cell_counts <- table(data.combined$seurat_clusters)
@@ -414,10 +291,10 @@ cell_counts <- table(data.combined$seurat_clusters)
 df_counts <- as.data.frame(cell_counts)
 colnames(df_counts) <- c("Cluster", "Cell_Count")
 
-# Calculate percentage distribution (ensuring it sums to 100)
+# Calculate percentage distribution
 df_counts$Percentage <- (df_counts$Cell_Count / sum(df_counts$Cell_Count)) * 100
 
-# Bar plot for percentage distribution with y-axis fixed from 0 to 100
+# Bar plot for percentage distribution with y-axis
 p1 <- ggplot(df_counts, aes(x = Cluster, y = Percentage, fill = Cluster)) +
   geom_bar(stat = "identity") +
   theme_minimal() +
@@ -443,40 +320,42 @@ p2 <- ggplot(df_counts, aes(x = Cluster, y = Cell_Count, fill = Cluster)) +
 ```
 
 
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results='asis', message=FALSE, warning=FALSE}
 cat("##", "Raw Count Distribution", " \n")
 print(p2)
 cat ('\n \n')
+
 cat("##", "Percentage Distribution", " \n")
 print(p1)
 cat ('\n \n')
 ```
 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Extract raw counts for the neutrophil cluster (cluster 5)
-# ILC_cells <- WhichCells(data.combined, ident = "24")
-# 
-# # Get the raw count of neutrophil cells
-# ILC_count <- length(ILC_cells)
-# 
-# # Get the total number of cells in the dataset
-# total_cells <- length(Cells(data.combined))
-# 
-# # Calculate the percentage of neutrophils in the dataset
-# ILC_percentage <- (ILC_count / total_cells) * 100
-# 
-# # Create a summary table
-# summary_table <- data.frame(
-#   "Cell Type" = c("ILCs", "Total Cells"),
-#   "Raw Count" = c(ILC_count, total_cells),
-#   "Percentage" = c(ILC_percentage, 100)
-# )
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Extract raw counts for the one cluster of interest if need be (e.g, cluster 24)
+24_cells <- WhichCells(data.combined, ident = "24")
+ 
+# Get the raw count of neutrophil cells
+24_count <- length(24_cells)
+ 
+# Get the total number of cells in the dataset
+total_cells <- length(Cells(data.combined))
+ 
+# Calculate the percentage of neutrophils in the dataset
+24_percentage <- (24_count / total_cells) * 100
+ 
+# Create a summary table
+summary_table <- data.frame(
+   "Cell Type" = c("24", "Total Cells"),
+  "Raw Count" = c(24_count, total_cells),
+   "Percentage" = c(24_percentage, 100)
+)
 ```
 
-<!-- # Cell Count for Cluster 24 (ILC) {.tabset} -->
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Cell Count for Cluster 24 {.tabset}
+
+```{r, results='asis', message=FALSE, warning=FALSE}
 # Display the summary table
-#paged_table(summary_table)
+paged_table(summary_table)
 ```
 
