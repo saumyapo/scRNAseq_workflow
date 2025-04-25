@@ -52,54 +52,134 @@ rmarkdown: `r packageVersion('rmarkdown')`,
 
 ggplot2: `r packageVersion('ggplot2')`
 
-```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
+<!-- Run GSEA (Clusterprofiler) for only one input csv -->
 
-# # Read Seurat object
-# data.combined <- readRDS("../RDS/data_filt_44_umap_29_clusters.RDS")
-# 
-# # Ensure RNA assay is set
-# DefaultAssay(data.combined) <- "RNA"
-# Idents(data.combined) <- "seurat_clusters"
-# 
-# # Store subcluster identities (backup)
-# data.combined$subcluster <- Idents(data.combined)
-# 
-# # Set condition as active identity
-# Idents(data.combined) <- "condition"
-# data.combined <- JoinLayers(data.combined)
-# # Create an empty list to store results
-# markers_list <- list()
-# 
-# # Loop over each subcluster
-# for (cluster in unique(data.combined$subcluster)) {
-#   #Subset data for the current subcluster
-#   message(paste0("Processing cluster: ", cluster))
-#   subcluster_data <- subset(data.combined, subset = subcluster == cluster)
-# 
-#   # Set condition as active identity
-#   Idents(subcluster_data) <- "condition"
-# 
-#   # Find all markers between HIV and Control within this subcluster
-#   markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-#   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
-#   # Store results with subcluster name
-#   markers_list[[paste0("immune_44_cluster_", cluster)]] <- markers
-# }
-# 
-# # Save results to CSV
-# for (name in names(markers_list)) {
-#   write.csv(markers_list[[name]], file=paste0("../csvs/condition/", name, "_HIV_vs_Control.csv"))
-# }
+```{r, results = FALSE,  message=FALSE, warning=FALSE}
+# Prepare gene sets for human
+
+set.seed(2024)
+human_gobp_sets <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
+human_kegg_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG_LEGACY")
+human_reactome_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+
+human_gene_sets <- rbind(human_gobp_sets, human_kegg_sets, human_reactome_sets)
+```
+
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+# Define the GSEA function for human
+
+gsea_human <- function(df, condition){
+  df_cluster <- df %>% dplyr::filter(cluster == condition)
+  lfc_vector <- df_cluster$avg_log2FC
+  names(lfc_vector) <- df_cluster$gene
+  lfc_vector <- sort(lfc_vector, decreasing = TRUE)
+
+  gsea_results <- GSEA(
+    geneList = lfc_vector, # Ordered ranked gene list
+    minGSSize = 5, # Minimum gene set size
+    maxGSSize = 500, # Maximum gene set size
+    eps = 0, # Boundary for calculating the p value
+    seed = TRUE, # Set seed to make results reproducible
+    pvalueCutoff = 1,
+    pAdjustMethod = "BH", # Benjamini-Hochberg correction
+    TERM2GENE = dplyr::select(human_gene_sets, gs_name, gene_symbol)
+  )
+  return(gsea_results@result)
+}
+```
+
+```{r, eval=FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Read the input CSV file
+degs_samples <- read_csv("../csvs/data_all_markers_condition.csv")
+
+# Define conditions (clusters) from input csv file
+conditions_samples <- as.character(unique(degs_samples$cluster))
+```
+
+```{r, eval=FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Perform GSEA for all conditions and collect results
+
+gsea_results_samples<- data.frame()
+
+ for (i in conditions_samples) {
+  gsea_samples_tmp <- gsea_human(degs_samples, i) %>% dplyr::mutate(cluster = i)
+  gsea_results_samples <- rbind(gsea_results_samples, gsea_samples_tmp)
+}
+```
+
+```{r, eval=FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Split the results by condition
+
+results_list_samples <- list()
+
+for (type in conditions_samples) {
+  type_results_samples <- gsea_results_samples %>% dplyr::filter(cluster == type) %>% dplyr::select(-cluster)
+  results_list_samples[[type]] <- type_results_samples
+ }
+```
+
+```{r, eval=FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Create a list of data frames for writing to Excel. While making the barplot by using this file, the results would have to be subsetted for only one condition
+
+write.xlsx(gsea_results_samples, file = "../csvs/GSEA_Clusterprofiler_Condition.xlsx")
+```
+
+
+
+<!-- Run GSEA (Clusterprofiler) for multiple input csv  (like subclusters) -->
+
+
+```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
+# Code block to find condition wise markers for each subcluster of subsetted data. Same code as present in 04_Subset_Clustering.Rmd file
+
+# Read Seurat object
+subset_data <- readRDS("../RDS/subset_umap_10_clusters.RDS")
+
+# Ensure RNA assay is set
+DefaultAssay(subset_data) <- "RNA"
+Idents(subset_data) <- "seurat_clusters"
+
+# Store subcluster identities (backup)
+subset_data$subcluster <- Idents(subset_data)
+
+# Set condition as active identity
+Idents(subset_data) <- "condition"
+
+subset_data <- JoinLayers(subset_data)
+
+# Create an empty list to store results
+markers_list <- list()
+
+# Loop over each subcluster
+for (cluster in unique(subset_data$subcluster)) {
+  # Subset data for the current subcluster
+   message("Processing Cluster: ", cluster)
+   subcluster_data <- subset(subset_data, subset = subcluster == cluster)
+ 
+  # Set condition as active identity
+  Idents(subcluster_data) <- "condition"
+
+  # Find all markers between Condition and Control within this subcluster
+  markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
+
+  # Store results with subcluster name
+   markers_list[[paste0("subset_subcluster_", cluster)]] <- markers
+}
+
+# Save results to CSV
+for (name in names(markers_list)) {
+  write.csv(markers_list[[name]], file=paste0("../csvs/subset/condition/", name, "_Condition_vs_Control.csv"))
+}
 ```
 
 
 ```{r, eval=FALSE, results = FALSE, message = FALSE}
-
 # Set the path to your CSV files
 csv_dir <- "../csvs/condition/"
 
 # Prepare gene sets for human
-#Picking the same categories as used for DAVID analysis
+# Picking the same categories as used for DAVID analysis
 set.seed(2024)
 human_gobp_sets <- msigdbr(species = "Homo sapiens", category = "C5", subcollection = "GO:BP")
 human_kegg_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcollection = "CP:KEGG_LEGACY")
@@ -108,33 +188,32 @@ human_reactome_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcol
 human_gene_sets <- rbind(human_gobp_sets, human_kegg_sets, human_reactome_sets)
 ```
 
-```{r, eval=FALSE, results = FALSE, message = FALSE}
+```{r, results=FALSE, message=FALSE, warning=FALSE}
 # Define the GSEA function for human
+
 gsea_human <- function(df, condition){
   df_cluster <- df %>% dplyr::filter(cluster == condition)
   lfc_vector <- df_cluster$avg_log2FC
   names(lfc_vector) <- df_cluster$gene
   lfc_vector <- sort(lfc_vector, decreasing = TRUE)
 
-  pathways_list <- split(human_gene_sets$gene_symbol, human_gene_sets$gs_name)
-
-  gsea_result <- fgsea(
-      pathways = pathways_list,
-      stats = lfc_vector,
-      minSize = 5,
-      maxSize = 500,
-      nPermSimple = 10000
-    )
-    
-  gsea_result$p.adjust <- p.adjust(gsea_result$pval, method = "fdr")
-  
-  return(gsea_result)
+  gsea_results <- GSEA(
+    geneList = lfc_vector, # Ordered ranked gene list
+    minGSSize = 5, # Minimum gene set size
+    maxGSSize = 500, # Maximum gene set size
+    eps = 0, # Boundary for calculating the p value
+    seed = TRUE, # Set seed to make results reproducible
+    pvalueCutoff = 1,
+    pAdjustMethod = "BH", # Benjamini-Hochberg correction
+    TERM2GENE = dplyr::select(human_gene_sets, gs_name, gene_symbol)
+  )
+  return(gsea_results@result)
 }
 ```
 
 ```{r, eval=FALSE, results = FALSE, message = FALSE}
 # List all relevant CSV files
-csv_files <- list.files(csv_dir, pattern = "_HIV_vs_Control.csv", full.names = TRUE)
+csv_files <- list.files(csv_dir, pattern = "_Condition_vs_Control.csv", full.names = TRUE)
 
 # Create a master list to collect results
 all_gsea_results <- list()
@@ -151,7 +230,7 @@ for (csv_path in csv_files) {
     warning("Skipping ", subcluster_name, " due to missing 'gene' column or low gene count.")
     next
   }
-  condition <- "HIV"
+  condition <- "Condition"
   gsea_result <- gsea_human(df, condition)
 
 
@@ -162,48 +241,15 @@ for (csv_path in csv_files) {
 
 # Combine and export
 combined_results <- do.call(rbind, all_gsea_results)
-write.xlsx(combined_results, file = "../csvs/condition/immune_44_combined_GSEA_results.xlsx")
-```
-
-```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Read the input CSV file
-# degs_samples <- read_csv("../csvs/data_filt_44_all_markers_29_clusters.csv")
-# 
-# # Define conditions (clusters) from input csv file
-# conditions_samples <- as.character(unique(degs_samples$cluster))
-```
-
-```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Perform GSEA for all conditions and collect results
-
-# gsea_results_samples<- data.frame()
-# for (i in conditions_samples) {
-#   gsea_samples_tmp <- gsea_human(degs_samples, i) %>% dplyr::mutate(cluster = i)
-#   gsea_results_samples <- rbind(gsea_results_samples, gsea_samples_tmp)
-# }
-```
-
-```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # Split the results by condition
-# results_list_samples <- list()
-# for (type in conditions_samples) {
-#   type_results_samples <- gsea_results_samples %>% dplyr::filter(cluster == type) %>% dplyr::select(-cluster)
-#   results_list_samples[[type]] <- type_results_samples
-# }
-```
-
-```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# # Create a list of data frames for writing to Excel
-# write.xlsx(results_list_samples, file = "../csvs/ClusterProfiler_GSEA_Immune_44_samples.xlsx")
-# write.xlsx(gsea_results_samples, file = "../csvs/GSEA_Cluster_Info_Immune_44_Samples.xlsx")
+write.xlsx(combined_results, file = "../csvs/condition/combined_GSEA_results.xlsx")
 ```
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Read the sheets into data frames
-samples_results <- read_excel("../csvs/condition/immune_44_combined_GSEA_results.xlsx")
+# Read the sheets into data frames. If reading in single csv file, then subset data to only condition of interest
+samples_results <- read_excel("../csvs/condition/combined_GSEA_results.xlsx")
 ```
 
-## `r colorize('ClusterProfiler Results', 'blue')` {.tabset}
+## ClusterProfiler Results {.tabset}
 
 ### Understanding the output
 
@@ -231,15 +277,15 @@ The output of the enrichment analysis is an excel file divided into subsheets ba
 
 11. core_enrichment: Specific genes involved in the core enrichment of the gene set. These are often the key members of the gene set contributing to its enrichment score.
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r,results='asis', message=FALSE, warning=FALSE}
 # Display the contents of the sheets using paged_table
 cat('###', "Samples Results", ' \n')
 paged_table(samples_results)
 cat(' \n \n')
 ```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Function to plot up/down pathways safely
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+# Function to plot up/down pathways 
 plot_top_pathways <- function(gsea_results, top_n = 10) {
   
   significant_results <- gsea_results %>%
@@ -256,7 +302,7 @@ plot_top_pathways <- function(gsea_results, top_n = 10) {
     head(top_n)
   
   up_plot <- if (nrow(top_up) > 0) {
-    ggplot(top_up, aes(x = reorder(pathway, NES), y = NES)) +
+    ggplot(top_up, aes(x = reorder(Description, NES), y = NES)) +
       geom_bar(stat = "identity", fill = "darkred") +
       coord_flip() +
       labs(title = "Top 10 Upregulated Pathways", x = "Pathway", y = "NES") +
@@ -269,7 +315,7 @@ plot_top_pathways <- function(gsea_results, top_n = 10) {
   }
 
   down_plot <- if (nrow(top_down) > 0) {
-    ggplot(top_down, aes(x = reorder(pathway, -NES), y = NES)) +
+    ggplot(top_down, aes(x = reorder(Description, -NES), y = NES)) +
     geom_bar(stat = "identity", fill = "skyblue") +
     coord_flip() +
     labs(title = "Top 10 Downregulated Pathways Based on NES", x = "Pathway", y = "Normalized Enrichment Score (NES)") +
@@ -286,10 +332,9 @@ plot_top_pathways <- function(gsea_results, top_n = 10) {
 ```
 
 
-```{r, results = FALSE, message = FALSE}
-# Path to CSVs
+```{r, results = FALSE, message = FALSE, warning=FALSE}
 # Store plots by cluster
-#str(samples_results)
+
 plots_by_cluster <- list()
 unique_clusters <- unique(samples_results$subcluster)
 
@@ -299,13 +344,12 @@ for (clust in unique_clusters) {
 }
 ```
 
-<!-- ## `r colorize('Barplots', 'blue')` {.tabset} -->
-
 ## Barplots {.tabset}
 
 Top 10 Upregulated and Downregulated Pathways based on NES
 
-```{r,results='asis', echo=FALSE, message=FALSE, warning=FALSE,fig.width=10,fig.height=6}
+```{r,results='asis', message=FALSE, warning=FALSE,fig.width=10,fig.height=6}
+# Change gsub from cluster to subcluster if required based on file name
 
 for (clust in names(plots_by_cluster)) {
   subcluster_clean <- gsub(".*?(cluster_\\d+).*", "\\1", clust)
@@ -322,14 +366,4 @@ for (clust in names(plots_by_cluster)) {
 }
 
 ```
-
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# PDF marker plot 
-# pdf("pdf_clusterprofiler_samples.pdf", width = 10, height = 8, useDingbats = FALSE)
-# print(plots_samples$up_plot)
-# print(plots_samples$down_plot)
-# dev.off()
-```
-
 
