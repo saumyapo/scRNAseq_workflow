@@ -29,7 +29,7 @@ library(shiny)
 library(openxlsx)
 library(scDblFinder)
 library(hdf5r)
-library(harmony, lib.loc ="/hpc/users/pothus02/.Rlib")
+library(harmony)
 library(DT)
 ```
 
