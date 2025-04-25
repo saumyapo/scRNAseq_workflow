@@ -164,6 +164,7 @@ gene_names <- rownames(data)
 mt_genes <- grep("^MT-", gene_names, value = TRUE)
 print(mt_genes)
 
+# Calculate mitochondrial gene percentage
 data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
  
 # Add new column with mitochondrial percentage information
@@ -174,52 +175,63 @@ data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
 gene_names <- rownames(data)
 rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
 print(rp_genes)
- 
+
+# Calculate ribosomal gene percentage
 data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
 
-# Add new column with mitochondrial percentage information
+# Add new column with ribosomal percentage information
 data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
 ```
 
-
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Save RDS with mitochondrial and ribosomal percentages
-#saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Save RDS with mitochondrial and ribosomal percentages
+saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
 ```
 
-```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = 'asis', message=FALSE, warning=FALSE}
 data <- readRDS("../RDS/data_combined_raw_umap.RDS")
-cat("##", "Mitochondrial", " \n")
+
+cat("##", "Mitochondrial %", " \n")
 DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
 VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+cat(" \n \n")
+
+cat("##", "Ribosomal %", " \n")
+DimPlot(data, reduction = "umap", group.by = "rp_label", raster = FALSE) + ggtitle ("Percentage of Ribosomal Genes")
+VlnPlot(data, features = c("percent.rp"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Ribosomal Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
 cat(" \n \n")
 ```
 
 
 
-```{r, eval = FALSE, echo=FALSE}
+```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE
 # Plot and save integrated umap
-# pdf(paste("../pdfs/non_integrated_mitochondrial_pct.pdf"), width=16, height=10, useDingbats = FALSE)
-# DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
-# VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
-# dev.off()
+pdf(paste("../pdfs/non_integrated_mitochondrial_pct.pdf"), width=16, height=10, useDingbats = FALSE)
+DimPlot(data, reduction = "umap", group.by = "mt_label", raster = FALSE) + ggtitle ("Percentage of Mitochondrial Genes")
+VlnPlot(data, features = c("percent.mt"), pt.size = 0.0, group.by = "sample") + ggtitle ("Percentage of Mitochondrial Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
+dev.off()
 ```
 
-
-
-```{r, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Filter out cells with >20% mitochondrial gene exp
-#data_filtered <- subset(data, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Filter out cells with >20% mitochondrial gene exp. Change according to data
+data_filtered <- subset(data, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
 ```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Save RDS post filtering
+saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
+```
+
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+# Read pre and post filtering RDS files to compute statistics on how many cells are being filtered
+
 data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
 data <- readRDS("../RDS/data_combined_raw_umap.RDS")
 
 # Get total and filtered cell counts 
 total_cells <- length(Cells(data))
 retained_cells <- length(Cells(data_filtered))
-filtered_cells <- total_cells - retained_cells  # Ensures correct total filtered count
+filtered_cells <- total_cells - retained_cells  
 
 # Calculate percentages
 retained_percentage <- (retained_cells / total_cells) * 100
@@ -231,14 +243,14 @@ na_filtered <- sum(is.na(data$nFeature_RNA) | is.na(data$percent.mt))
 # Count cells removed due to BOTH filters (overlap)
 overlap_filtered <- sum((data$nFeature_RNA < 200 | data$nFeature_RNA > 2500) & (data$percent.mt > 20), na.rm = TRUE)
 
-# Directly count cells removed for nFeature_RNA and percent.mt, adjusting for overlap
+# Count cells removed for nFeature_RNA and percent.mt, adjusting for overlap
 nfeature_count <- sum(data$nFeature_RNA < 200 | data$nFeature_RNA > 2500, na.rm = TRUE) 
 mitochondrial_cells <- sum(data$percent.mt > 20, na.rm = TRUE)
 
 # Correct the total filtered count by adding NAs
 filtered_cells_corrected <- nfeature_count + mitochondrial_cells - overlap_filtered + na_filtered
 
-# Format a clean summary table
+# Summary table
 summary_table <- data.frame(
   "Category" = c("Total Cells", "Retained Cells", "Total Filtered Cells", "nFeature_RNA Cells", "Mitochondrial Cells"),
   "Raw Count" = c(total_cells, retained_cells, filtered_cells, nfeature_count, mitochondrial_cells),
@@ -255,73 +267,69 @@ summary_table <- data.frame(
 summary_table$Percentage <- format(summary_table$Percentage, scientific = FALSE)
 ```
 
-# `r colorize('Cell Count Summary', 'blue')`
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
-# Display the summary table
+# Cell Count Summary
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+# Display summary table
 paged_table(summary_table)
 ```
 
 
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Save RDS post filtering
-#saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
-```
-
-
-# `r colorize("Non-integrated 44 immune samples (HIV and control), after Mitochondrial and nFeature RNA Filtering", "blue")` {.tabset}
+# Non-integrated Samples after mitochondrial and nFeature RNA Filtering {.tabset}
 
 ```{r, results = 'asis', echo=FALSE, message=FALSE, warning=FALSE}
+
 data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
 
 cat("##", "Samples", " \n")
 DimPlot(data, reduction = "umap", group.by = "sample_names", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering") + theme(legend.position = "none")
+
 cat(" \n \n")
 cat("##", "Condition", " \n")
 DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggtitle ("UMAP post Mitochondrial Filtering")
 cat(" \n \n")
-
 ```
 
 
-# `r colorize('Doublet Detection', 'blue')`
+# Doublet Detection
 
-```{r, eval=FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Doublet detection using scDblfinder)
-# data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
-# DefaultAssay(data_filtered) <- "RNA"
-# set.seed(100)
-# 
-# sce <- data_filtered
-# sce <- sce %<>% JoinLayers() %>% as.SingleCellExperiment() #Since there are multiple layers and sce needs to be 1
-# #data_filtered[["RNA"]] <- as(data_filtered[["RNA"]], Class="Assay")
-# #sce <- as.SingleCellExperiment(data_filtered, layer = "counts")
-# sce <- scDblFinder(sce)
-# table(sce$scDblFinder.class)
-# sce@colData@listData %>% as.data.frame() %>% head()
+```{r, eval=FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Doublet detection using scDblfinder)
+data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+DefaultAssay(data_filtered) <- "RNA"
+set.seed(100)
+
+sce <- data_filtered
+sce <- as.SingleCellExperiment(sce)
+sce <- scDblFinder(sce)
+table(sce$scDblFinder.class)
+sce@colData@listData %>% as.data.frame() %>% head()
 ```
 
-```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# 
-# # Explore results and add to seurat object
-# meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
-#   dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
-# head(meta_scdblfinder)
-# rownames(meta_scdblfinder) <- sce@colData@rownames
-# head(meta_scdblfinder)
-# data_filtered<- AddMetaData(object = data_filtered, metadata = meta_scdblfinder %>% dplyr::select('scDblFinder.class'))
+```{r, eval= FALSE, results = FALSE, message=FALSE, warning=FALSE}
+meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
+  dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
+head(meta_scdblfinder)
+
+# Explore results and add to seurat object
+meta_scdblfinder <- sce@colData@listData %>% as.data.frame() %>%
+  dplyr::select(starts_with('scDblFinder')) # 'scDblFinder.class')
+head(meta_scdblfinder)
+
+rownames(meta_scdblfinder) <- sce@colData@rownames
+head(meta_scdblfinder)
+data_filtered<- AddMetaData(object = data_filtered, metadata = meta_scdblfinder %>% dplyr::select('scDblFinder.class'))
 ```
 
-```{r, eval = FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-#Save RDS with doublet information
-#saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Save RDS with doublet information
+saveRDS(data_filtered, file = paste("../RDS/data_filtered_umap.RDS"))
 ```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-#data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
-#data <- readRDS("../RDS/data_combined_raw_umap.RDS)
+```{r, results = FALSE,  message=FALSE, warning=FALSE}
+# Read both RDS files to calculate metrics on how many cells would be retained after doublet filtering
+data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+data <- readRDS("../RDS/data_combined_raw_umap.RDS)
 
 # Get the total number of cells in the dataset
 total_cells <- length(Cells(data_filtered))
@@ -348,27 +356,33 @@ doublet_summary <- data.frame(
 
 After mitchondrial >20%  and nFeature_RNA (<200 OR >2500) filtering.
 
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results='asis', message=FALSE, warning=FALSE}
 # Display the summary table
 cat("###", "Doublet Summary", " \n")
 paged_table(doublet_summary)
 cat(" \n \n")
+
 # Visualize with the annotated cell types
 cat("###", "Doublet Dimplot", " \n")
 DimPlot(data_filtered, reduction = "umap", group.by="scDblFinder.class") + ggtitle("Doublet Distribution")
 cat(" \n \n")
 ```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# seu_dblt <- subset(data.combined,scDblFinder.class == 'singlet')
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# Filter out cells that are doublets according to scDblFinder and save only singlets
+seu_dblt <- subset(data.combined, scDblFinder.class == 'singlet')
+
+saveRDS(seu_dblt, "../RDS/data_dblt_filtered_umap.RDS")
 ```
 
 
-# `r colorize('Cell Count Distribution', 'blue')` {.tabset}
+# Cell Count Distribution {.tabset}
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results=FALSE, message=FALSE, warning=FALSE}
+# Calculate cell distribution sample wise, raw counts and percentages
+
 # Load filtered dataset
-#data_filtered <- readRDS("../RDS/data_filtered_umap.RDS")
+data_filtered <- readRDS("../RDS/data_dblt_filtered_umap.RDS")
 
 # Count number of cells per sample
 cell_counts <- table(data_filtered$sample_names)
@@ -406,10 +420,11 @@ p2 <- ggplot(df_counts, aes(x = Sample, y = Cell_Count, fill = Sample)) +
 ```
 
 
-```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results='asis', message=FALSE, warning=FALSE}
 cat("##", "Raw Count Distribution", " \n")
 print(p2)
 cat ('\n \n')
+
 cat("##", "Percentage Distribution", " \n")
 print(p1)
 cat ('\n \n')
