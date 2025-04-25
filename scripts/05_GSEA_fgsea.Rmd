@@ -1,5 +1,5 @@
 ---
-title: "GSEA Analysis for Immune 44 Samples"
+title: "GSEA Analysis"
 author: "Saumya"
 date: "`r Sys.Date()`"
 output:
@@ -14,56 +14,22 @@ output:
 ---
 
 
-```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Markdown parameters
-set_echo = FALSE
-set_eval = FALSE
-```
-
-```{r, results=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
-# Function to set markdown text color
-colorize <- function(x, color) {
-  if (knitr::is_latex_output()) {
-    sprintf("\\textcolor{%s}{%s}", color, x)
-  } else if (knitr::is_html_output()) {
-    sprintf("<span style='color: %s;'>%s</span>", color,
-            x)
-  } else x
-}
-```
-
-```{r, include=FALSE}
-# Set height of chunk output
-options(width = 60)
-local({
-  hook_output <- knitr::knit_hooks$get('output')
-  knitr::knit_hooks$set(output = function(x, options) {
-    if (!is.null(options$max.height)) options$attr.output <- c(
-      options$attr.output,
-      sprintf('style="max-height: %s;"', options$max.height)
-    )
-    hook_output(x, options)
-  })
-})
-```
-
-
 ```{r, results = FALSE, message = FALSE}
 # Load required libraries
 library(openxlsx)
 library(clusterProfiler)
-library(msigdbr, lib.loc = "/hpc/users/pothus02/.Rlib")
+library(msigdbr)
 library(org.Hs.eg.db)
 library(tidyverse)
 library(readxl)
 library(rmarkdown)
 library(ggplot2)
 library(fgsea)
-library(msigdbdf, lib.loc = "/hpc/users/pothus02/.Rlib")
+library(msigdbdf)
 ```
 
 <!-- Information of Used Library -->
-### `r colorize('Information of Used R Libraries', 'blue')` 
+## Information of Used R Libraries
 
 The following R libraries were used to process the data and produce this report.
 
@@ -86,7 +52,8 @@ rmarkdown: `r packageVersion('rmarkdown')`,
 
 ggplot2: `r packageVersion('ggplot2')`
 
-```{r, results = FALSE, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
+
 # # Read Seurat object
 # data.combined <- readRDS("../RDS/data_filt_44_umap_29_clusters.RDS")
 # 
