@@ -20,10 +20,106 @@ library(Seurat)
 library(ShinyCell)
 ```
 
+<!-- Single RDS mode which allows for viewing of one Seurat RDS object per application -->
+
 ```{r}
+# Seurat object RDS
 data.combined <- readRDS("/RDS/data_umap_10_clusters.RDS")
+
+# ShinyCell configuration
 scConf = createConfig(data.combined)
+
 data.combined <- JoinLayers(data.combined)
+
+# Generates directory shinyApp which contains the RShiny application
 makeShinyApp(data.combined, scConf, gene.mapping = TRUE,
              shiny.title =  "Clustered Data")
 ```
+
+
+<!-- Running multiApp mode which allows for viewing of multiple Seurat RDS objects in a single application -->
+
+```{r}
+#All celltypes
+data.combined <- readRDS("/RDS/data_umap_33_clusters.RDS")
+
+#Config 1
+scConf1 = createConfig(data.combined)
+
+data.combined <- JoinLayers(data.combined)
+
+# Config number and shiny.prefix need to be changed for each RDS
+makeShinyFiles(data.combined, scConf1, gex.assay = "RNA", gex.slot = "data",
+               gene.mapping = TRUE, shiny.prefix = "sc1",
+               shiny.dir = "shinyAppMulti/",
+               default.dimred = c("umap1", "umap2"))
+```
+
+
+```{r}
+#Subset1 Subcluster
+subset1_data <- readRDS("/RDS/subset1_umap_3_clusters.RDS")
+
+#Config 2
+scConf2 = createConfig(subset1_data)
+
+subset1_data <- JoinLayers(subset1_data)
+
+makeShinyFiles(subset1_data, scConf2, gex.assay = "RNA", gex.slot = "data",
+               gene.mapping = TRUE, shiny.prefix = "sc2",
+               shiny.dir = "shinyAppMulti/",
+               default.dimred = c("umap1", "umap2"))
+```
+
+
+```{r}
+# Subset2 Subcluster
+subset2_data <- readRDS("/RDS/subset2_umap_19_clusters.RDS")
+
+# Config 3
+scConf3 = createConfig(subset2_data)
+
+subset2_data <- JoinLayers(subset2_data)
+
+makeShinyFiles(subset2_data, scConf3, gex.assay = "RNA", gex.slot = "data",
+               gene.mapping = TRUE, shiny.prefix = "sc3",
+               shiny.dir = "shinyAppMulti/",
+               default.dimred = c("umap1", "umap2"))
+```
+
+```{r}
+# Subset3
+subset3_data <- readRDS("/RDS/subset3_umap_3_clusters.RDS")
+
+# Config 3
+scConf4 = createConfig(subset3_data)
+
+subset3_data <- JoinLayers(subset3_data)
+
+makeShinyFiles(subset3_data, scConf4, gex.assay = "RNA", gex.slot = "data",
+               gene.mapping = TRUE, shiny.prefix = "sc4",
+               shiny.dir = "shinyAppMulti/",
+               default.dimred = c("umap1", "umap2"))
+```
+
+```{r}
+
+# Combining 4 RDS objects to view them in a single RShiny application
+
+citation = list(
+  author  = "Liu X., Ouyang J.F., Rossello F.J. et al.",
+  title   = "",
+  journal = "Nature",
+  volume  = "586",
+  page    = "101-107",
+  year    = "2020",
+  doi     = "10.1038/s41586-020-2734-6",
+  link    = "https://www.nature.com/articles/s41586-020-2734-6")
+makeShinyCodesMulti(
+  shiny.title = "Combined Data", shiny.footnotes = citation,
+  shiny.prefix = c("sc1", "sc2", "sc3", "sc4"),
+  shiny.headers = c("All Celltypes", "Subset 1", "Subset 2","Subset 3"),
+  shiny.dir = "shinyAppMulti/")
+```
+
+
