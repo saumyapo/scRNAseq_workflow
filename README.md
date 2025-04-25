@@ -1,1 +1,1 @@
-# Single cell RNA-seq Seurat Workflow
+# Single cell RNA-seq Workflow
