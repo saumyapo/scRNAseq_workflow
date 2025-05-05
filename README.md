@@ -1,11 +1,8 @@
 [![Analysis Tools:](https://img.shields.io/badge/Analysis%20Tools:-Seurat%20v5&#46;1&#46;0-orange.svg)](https://satijalab.org/seurat/)
-
 [![Integration Tools:](https://img.shields.io/badge/Integration%20Tools:-Harmony%20v1&#46;2&#46;3-FFD700)](https://github.com/immunogenomics/harmony)
-
 [![Pathway Analysis Tools:](https://img.shields.io/badge/Package%20Analysis%20Tools:-grey)](https://github.com/saumyapo/scRNAseq_workflow/) [![clusterProfiler](https://img.shields.io/badge/clusterProfiler%20v4&#46;12&#46;6-darkred.svg)](https://bioconductor.org/packages/release/bioc/html/clusterProfiler.html) [![fgsea](https://img.shields.io/badge/fgsea%20v1&#46;24&#46;0-darkgreen.svg)](https://github.com/alserglab/fgsea)
 
 [![Cell-Cell Communication:](https://img.shields.io/badge/Cell%E2%80%94Cell%20Communication:-grey)](https://github.com/saumyapo/scRNAseq_workflow/) [![Liana](https://img.shields.io/badge/Liana%20v0&#46;1&#46;14-blue.svg)](https://saezlab.github.io/liana/index.html) [![CellChat](https://img.shields.io/badge/CellChat%20v2&#46;1&#46;2-purple.svg)](https://github.com/sqjin/CellChat)
-
 [![RShiny:](https://img.shields.io/badge/RShiny:-ShinyCell%20v2&#46;1&#46;0-pink)](https://github.com/SGDDNB/ShinyCell)
 
 # Single cell RNA-seq Workflow
