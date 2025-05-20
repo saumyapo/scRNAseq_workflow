@@ -1,0 +1,33 @@
+---
+title: "Seurat Object to AnnData Conversion Using SeuratDisk"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true # Adds numbers to headers
+    css: styles.css
+    code_folding: hide
+---
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+library(SeuratDisk)
+library(SeuratData)
+library(Seurat)
+```
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+seurat_object <- readRDS("seurat_object.RDS")
+# Downgrade from Assay5 to Assay, since most conversion tools are compatiable with Seurat V3/V4 but not V5
+seurat_object["RNA"]] <- as(object = seurat_object[["RNA"]], Class = "Assay")
+
+# Save .h5Seurat object
+SeuratDisk::SaveH5Seurat(seurat_object, "seurat_object.h5Seurat")
+
+# Convert and save .h5ad object which can be loaded in scanpy
+SeuratDisk::Convert("seurat_object_new.h5Seurat", dest = "h5ad")
+```
