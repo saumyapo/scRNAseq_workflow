@@ -23,7 +23,7 @@ library(Seurat)
 ```{r, results = FALSE, message=FALSE, warning=FALSE}
 seurat_object <- readRDS("seurat_object.RDS")
 # Downgrade from Assay5 to Assay, since most conversion tools are compatiable with Seurat V3/V4 but not V5
-seurat_object["RNA"]] <- as(object = seurat_object[["RNA"]], Class = "Assay")
+seurat_object[["RNA"]] <- as(object = seurat_object[["RNA"]], Class = "Assay")
 
 # Save .h5Seurat object
 SeuratDisk::SaveH5Seurat(seurat_object, "seurat_object.h5Seurat")
