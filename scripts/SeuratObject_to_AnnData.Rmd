@@ -21,13 +21,19 @@ library(Seurat)
 ```
 
 ```{r, results = FALSE, message=FALSE, warning=FALSE}
+# 1. Load Seurat object
 seurat_object <- readRDS("seurat_object.RDS")
-# Downgrade from Assay5 to Assay, since most conversion tools are compatiable with Seurat V3/V4 but not V5
+
+# 2. Downgrade from Assay5 to Assay, since most conversion tools are compatiable with Seurat V3/V4 but not V5
 seurat_object[["RNA"]] <- as(object = seurat_object[["RNA"]], Class = "Assay")
 
-# Save .h5Seurat object
+# 3. Clear out scale.data to prevent SeuratDisk from using it. This helps to retain normalized and raw counts. This helps to store raw counts in raw.X layer in scanpy, and normalized counts in .X layer. If scale data is used then normalized counts is stored in raw.X, and scaled data is stored in .X layer.
+
+seurat_object[["RNA"]]@scale.data <- matrix(numeric(0), nrow = 0, ncol = 0)
+
+# 4. Save .h5Seurat object
 SeuratDisk::SaveH5Seurat(seurat_object, "seurat_object.h5Seurat")
 
-# Convert and save .h5ad object which can be loaded in scanpy
+# 5. Convert and save .h5ad object which can be loaded in scanpy
 SeuratDisk::Convert("seurat_object_new.h5Seurat", dest = "h5ad")
 ```
