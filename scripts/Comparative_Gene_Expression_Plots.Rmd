@@ -1,0 +1,116 @@
+---
+title: "Comparative Gene Expression Plots"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true # Adds numbers to headers
+    css: styles.css
+    code_folding: hide
+---
+
+```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
+data.combined <- readRDS("data_filt_44_umap_29_clusters.RDS")
+```
+
+# Heatmap
+
+```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
+plot_expression_heatmap <- function(seurat_obj, genes) {
+  expr_df <- FetchData(seurat_obj, vars = c(genes, "seurat_clusters", "condition"))
+  expr_df$cluster <- as.character(seurat_obj$seurat_clusters)
+  expr_df$condition <- seurat_obj$condition
+  expr_df$cluster_condition <- paste0(expr_df$cluster, "_", expr_df$condition)
+
+  # Pivot the data to make it long-form (one row per gene/cluster/condition)
+  expr_df_long <- expr_df %>%
+    pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "expr") %>%
+    mutate(gene_label = paste0(gene, "_", condition))
+
+  # Set factor levels to keep clusters ordered
+  expr_df_long$cluster <- factor(expr_df_long$cluster, levels = as.character(0:28))
+
+  plot_data <- expr_df_long %>%
+    group_by(cluster, gene_label) %>%
+    summarize(mean_exp = mean(expr), .groups = "drop")
+
+  ggplot(plot_data, aes(x = cluster, y = gene_label, fill = mean_exp)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(low = "lightgrey", high = "purple") +
+    labs(x = "Cluster", y = "Gene by Condition", title = "Expression Heatmap") +
+    theme_minimal()
+}
+
+# Running function for single gene and multiple genes
+plot_expression_heatmap(data.combined, "STAT1")
+plot_expression_heatmap(data.combined, c("STAT1", "IRF1", "ISG15"))
+```
+
+# Dotplot
+
+```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
+plot_expression_dotplot <- function(seurat_obj, genes) {
+  expr_df <- FetchData(seurat_obj, vars = c(genes, "seurat_clusters", "condition"))
+  expr_df$cluster <- as.character(seurat_obj$seurat_clusters)
+  expr_df$condition <- seurat_obj$condition
+
+  expr_df <- expr_df %>%
+    pivot_longer(cols = all_of(genes), names_to = "gene", values_to = "expr") %>%
+    mutate(gene_label = paste0(gene, "_", condition))
+
+  expr_df$cluster <- factor(expr_df$cluster, levels = as.character(0:28))
+
+  plot_data <- expr_df %>%
+    group_by(cluster, gene_label) %>%
+    summarize(
+      pct_exp = mean(expr > 0) * 100,
+      mean_exp = mean(expr),
+      .groups = "drop"
+    )
+
+  ggplot(plot_data, aes(x = cluster, y = gene_label)) +
+    geom_point(aes(size = pct_exp, color = mean_exp)) +
+    scale_size_continuous(range = c(1, 6), name = "Percent Expressed") +
+    scale_color_gradient(low = "lightgrey", high = "darkblue", name = "Mean Expr") +
+    labs(x = "Cluster", y = "Gene by Condition", title = "Expression Dotplot") +
+    theme_minimal()
+}
+
+# Running function for single gene and multiple genes
+plot_expression_dotplot(data.combined, "STAT1") 
+plot_expression_dotplot(data.combined, c("STAT1", "IRF1", "ISG15"))
+```
+
+
+# Violin Plot
+
+```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
+plot_expression_violin_seurat <- function(seurat_obj, genes) {
+  
+  VlnPlot(seurat_obj, 
+          features = genes, 
+          pt.size = 0.1,        
+          group.by = "seurat_clusters", 
+          split.by = "condition",  
+          cols = c("blue", "red"),   
+          combine = TRUE,           
+          ncol = 1)             
+}
+
+# Running function for single gene and multiple genes
+plot_expression_violin_seurat(data.combined, "STAT1")
+plot_expression_violin_seurat(data.combined, c("STAT1", "IRF1"))
+```
+
