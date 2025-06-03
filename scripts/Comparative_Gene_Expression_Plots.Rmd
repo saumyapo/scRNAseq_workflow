@@ -22,7 +22,7 @@ library(tidyr)
 ```
 
 ```{r, results = FALSE, eval = FALSE, message = FALSE, warning = FALSE}
-data.combined <- readRDS("data_filt_44_umap_29_clusters.RDS")
+data <- readRDS("seu.RDS")
 ```
 
 # Heatmap
@@ -54,8 +54,8 @@ plot_expression_heatmap <- function(seurat_obj, genes) {
 }
 
 # Running function for single gene and multiple genes
-plot_expression_heatmap(data.combined, "STAT1")
-plot_expression_heatmap(data.combined, c("STAT1", "IRF1", "ISG15"))
+plot_expression_heatmap(data, "STAT1")
+plot_expression_heatmap(data, c("STAT1", "IRF1", "ISG15"))
 ```
 
 # Dotplot
@@ -89,8 +89,8 @@ plot_expression_dotplot <- function(seurat_obj, genes) {
 }
 
 # Running function for single gene and multiple genes
-plot_expression_dotplot(data.combined, "STAT1") 
-plot_expression_dotplot(data.combined, c("STAT1", "IRF1", "ISG15"))
+plot_expression_dotplot(data, "STAT1") 
+plot_expression_dotplot(data, c("STAT1", "IRF1", "ISG15"))
 ```
 
 
@@ -101,7 +101,7 @@ plot_expression_violin_seurat <- function(seurat_obj, genes) {
   
   VlnPlot(seurat_obj, 
           features = genes, 
-          pt.size = 0.1,        
+          pt.size = 0,        
           group.by = "seurat_clusters", 
           split.by = "condition",  
           cols = c("blue", "red"),   
@@ -110,7 +110,7 @@ plot_expression_violin_seurat <- function(seurat_obj, genes) {
 }
 
 # Running function for single gene and multiple genes
-plot_expression_violin_seurat(data.combined, "STAT1")
-plot_expression_violin_seurat(data.combined, c("STAT1", "IRF1"))
+plot_expression_violin_seurat(data, "STAT1")
+plot_expression_violin_seurat(data, c("STAT1", "IRF1"))
 ```
 
