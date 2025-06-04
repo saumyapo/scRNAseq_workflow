@@ -109,10 +109,17 @@ Find markers for every cluster compared to all remaining cells, report both posi
 # Find All Markers for Seurat clusters. Idents can be set to condition/site or any other column as required
 
 data.combined <- readRDS("../RDS/data_umap_33_clusters.RDS")
-DefaultAssay(data.combined) <- "RNA"
-Idents(data.combined) <- "seurat_clusters"
 
+#JoinLayers() is not compatible with SCT Assay
+DefaultAssay(data.combined) <- "RNA"
 data.combined <- JoinLayers(data.combined)
+
+# SCT Assay creates multiple models and that needs to be corrected to retain only recorrected counts before finding markers
+DefaultAssay(data.combined) <- "SCT"
+PrepSCTFindMarkers(data.combined, assay = "SCT", verbose = TRUE)
+
+
+Idents(data.combined) <- "seurat_clusters"
 
 data.markers <- SeuratWrappers::RunPrestoAll(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
 
