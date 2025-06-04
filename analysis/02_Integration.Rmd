@@ -84,9 +84,6 @@ data.combined <- readRDS("../RDS/data_Integrated.RDS")
 
 
 ```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
-# Run the standard workflow for visualization and clustering
-data.combined <- ScaleData(data.combined, verbose = FALSE)
-
 # Run UMAP using the Harmony embeddings, not the original PCA
 data.combined <- RunUMAP(data.combined, reduction = "harmony", dims = 1:20)
  
