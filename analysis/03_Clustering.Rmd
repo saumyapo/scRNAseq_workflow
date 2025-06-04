@@ -31,6 +31,7 @@ library(scDblFinder)
 library(hdf5r)
 library(harmony)
 library(DT)
+library(SeuratWrappers)
 ```
 
 <!-- Information of Used Library -->
@@ -113,7 +114,7 @@ Idents(data.combined) <- "seurat_clusters"
 
 data.combined <- JoinLayers(data.combined)
 
-data.markers <- FindAllMarkers(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
+data.markers <- SeuratWrappers::RunPrestoAll(data.combined, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
 
 # Save markers
 write.csv(data.markers, file='../csvs/data_all_markers_33_clusters.csv')
