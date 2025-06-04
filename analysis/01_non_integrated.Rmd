@@ -30,6 +30,7 @@ library(shiny)
 library(openxlsx)
 library(scDblFinder)
 library(hdf5r)
+library(future)
 ```
 
 <!-- Information of Used Library -->
@@ -118,10 +119,12 @@ saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
 
 ```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
 # Standard Seurat workflow
+data <- readRDS("../RDS/data_combined_raw.RDS")
 
-data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
-data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
-data <- ScaleData(data, verbose = FALSE)
+options(future.globals.maxSize = 2 * 1024^3)
+
+# run sctransform
+data <- SCTransform(data, verbose = TRUE)
 
 #dimension reduction
 data <- RunPCA(data, npcs = 50, verbose = FALSE)
@@ -129,8 +132,8 @@ data <- RunPCA(data, npcs = 50, verbose = FALSE)
 # Check how many PCs to use
 ElbowPlot(data, ndims = 50)
 
-# Change number of dims based on ElbowPlot cutoff
-data <- RunUMAP(data, reduction = "pca", dims = 1:50)
+# Use appropriate number of PCs
+data <- RunUMAP(data, reduction = "pca", dims = 1:20)
 ```
 
 ```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
