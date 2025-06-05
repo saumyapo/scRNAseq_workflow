@@ -121,10 +121,10 @@ saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
 # Standard Seurat workflow
 data <- readRDS("../RDS/data_combined_raw.RDS")
 
-options(future.globals.maxSize = 2 * 1024^3)
-
-# run sctransform
-data <- SCTransform(data, verbose = TRUE)
+# Standard normalisation workflow
+data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
+data <- FindVariableFeatures(data, selection.method = "vst", nfeatures = 2000)
+data <- ScaleData(data, verbose = TRUE)
 
 #dimension reduction
 data <- RunPCA(data, npcs = 50, verbose = FALSE)
