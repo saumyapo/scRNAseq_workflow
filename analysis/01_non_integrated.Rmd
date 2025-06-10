@@ -61,7 +61,7 @@ h5_string <- "_filtered_feature_bc_matrix.h5"
 
 ```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
 # Define filenames and path
-filenames <- c(file.path(data_dir, paste0(sampleNames, h5_string)))
+filenames <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
 
 # Check if the path for the files is right
 filenames
