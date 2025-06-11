@@ -103,7 +103,7 @@ DimPlot(data.bf, reduction = "umap", group.by= 'sample_names' ) + ggtitle('Sampl
 cat(' \n \n')
 
 # Sample wise dimplot
-for (samp in sample_names_list) {
+for (samp in sampleNames) {
   cat('##',samp,' \n')
   print(DimPlot(subset(data.bf, subset = (sample_names %in% c(samp))), reduction = "umap") + ggtitle(samp))
  cat(' \n \n')
@@ -121,7 +121,7 @@ DimPlot(data.combined, reduction = "umap", group.by= 'sample_names' ) + ggtitle(
 cat(' \n \n')
 
 # Sample wise dimplot
-for (samp in sample_names_list) {
+for (samp in sampleNames) {
   cat('##',samp,' \n')
   print(DimPlot(subset(data.combined, subset = (sample_names %in% c(samp))), reduction = "umap") + ggtitle(samp))
  cat(' \n \n')
