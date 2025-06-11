@@ -96,9 +96,11 @@ saveRDS(combined_data, file = "../RDS/data_combined_raw.RDS")
 # Add condition information based on sample names
 data <- readRDS("../RDS/data_combined_raw.RDS")
 
-sample_to_group <- c("ABC" = "Control",
-                    "XYZ" = "Condition",
-                    "LMN" = "Condition")
+sample_to_group <- setNames(
+  ifelse(grepl("NV", sampleNames), "Control",
+         ifelse(grepl("IBD|UC", sampleNames), "UC", NA)),
+  sampleNames
+)
 
 # Apply the new annotations to your Seurat object
 data$condition <- plyr::mapvalues(
