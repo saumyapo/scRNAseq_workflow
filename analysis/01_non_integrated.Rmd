@@ -88,13 +88,10 @@ combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sam
  
 combined_data@meta.data$sample_names <- combined_data@meta.data$orig.ident
 
-# Save the combined Seurat object
-saveRDS(combined_data, file = "../RDS/data_combined_raw.RDS")
 ```
 
 ```{r, eval= FALSE, results = FALSE, message=FALSE, warning=FALSE}
 # Add condition information based on sample names
-data <- readRDS("../RDS/data_combined_raw.RDS")
 
 sample_to_group <- setNames(
   ifelse(grepl("NV", sampleNames), "Control",
@@ -103,19 +100,19 @@ sample_to_group <- setNames(
 )
 
 # Apply the new annotations to your Seurat object
-data$condition <- plyr::mapvalues(
-  data$sample_names,
+combined_data$condition <- plyr::mapvalues(
+  combined_data$sample_names,
    from = names(sample_to_group),
   to = sample_to_group
 )
 
 # Check if condition has been mapped appropriately
-unique(data$condition)
+unique(combined_data$condition)
 ```
 
 
 ```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
-saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
+saveRDS(combined_data, file = paste("../RDS/data_combined_raw.RDS"))
 ```
 
 
