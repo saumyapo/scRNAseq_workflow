@@ -314,9 +314,9 @@ subset_data$cluster_label <- plyr::mapvalues(
 )
 
 # Update the identities in the Seurat object
-Idents(subset_data) <- myeloid_subset$cluster_label
+Idents(subset_data) <- subset_data$cluster_label
  
-saveRDS(subset_data, "../RDS/myeloid_V2/data_myeloid_umap_12_clusters.RDS")
+saveRDS(subset_data, "../RDS/subset_umap_12_clusters.RDS")
 ```
 
 # Annotated subset clusters
