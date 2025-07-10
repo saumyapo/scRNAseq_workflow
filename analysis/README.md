@@ -153,10 +153,5 @@ Interpretation is iterative. Clusters may be split further or merged based on ma
 # 9. Downstream Analyses
 Beyond the core workflow, additional analyses include:
 
-Batch Correction and Integration: Combining multiple samples using IntegrateData() to remove batch effects.
-
-Trajectory Inference: Ordering cells along developmental trajectories using tools such as Monocle or Slingshot.
-
-Cell-Cell Communication: Predicting ligand-receptor interactions using tools like CellPhoneDB or CellChat.
-
-These analyses extend insights from basic clustering to deeper biological questions such as lineage relationships and intercellular signaling.
+1. Trajectory Inference: Ordering cells along developmental trajectories using tools such as Monocle or Slingshot.
+2. Cell-Cell Communication: Predicting ligand-receptor interactions using tools like CellPhoneDB or CellChat.
