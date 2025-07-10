@@ -98,6 +98,7 @@ Integration is the process of removing batch effects that exist in the data whic
 There are many integration packages that exist, including Seurat's anchor based integration. There are pros and cons to every approach but Harmony is used industry wide due to being really fast and accurate.
 
 ```{r}
+library(harmony)
 seurat_object <- RunHarmony(seurat_object, group.by.vars = "sample_names")
 ```
 
@@ -164,12 +165,32 @@ Heatmap()
 Interpretation is iterative. Clusters may be split further or merged based on marker genes and biological context. Cells with ambiguous identity can be excluded. Biological hypotheses can be developed from the marker genes and cluster relationships.
 
 # 10. Gene Set Enrichment Analysis - GSEA (`05_GSEA_Clusterprofiler.Rmd`)
-GSEA
+Gene Set Enrichment Analysis (GSEA) is used to identify whether specific biological pathways or gene sets are overrepresented in differentially expressed genes. This helps to interpret clusters in terms of known biological functions rather than individual genes.
+
+- In the workflow, `clusterProfiler` is a commonly used R package for running GSEA on marker genes. Significant pathways can be visualized with bar plots or dot plots to show enrichment scores and adjusted p-values.
+- Typical workflow steps include preparing a ranked gene list, performing enrichment, and visualizing results:
+
+```r
+library(clusterProfiler)
+gsea_result <- gseGO(geneList = ranked_genes, OrgDb = org.Hs.eg.db, ont = "BP")
+```
+This ranks genes by log fold-change or a similar statistic and tests for enrichment in Gene Ontology terms or KEGG pathways.
+
+---
 
 Beyond the core workflow, additional analyses include:
 
-# 11. Trajectory Inference
-Ordering cells along developmental trajectories using tools such as Monocle or Slingshot.
+# 11. Trajectory Inference (`06_Trajectory_Analysis.Rmd`)
+Trajectory inference arranges single cells along a pseudotime axis to infer dynamic biological processes such as cell differentiation or activation. This analysis is particularly useful for studying developmental lineages or transitional cell states that are not captured by discrete clusters alone.
 
-# 12. Cell-Cell Communication (`06_CellChat.Rmd`)
-Predicting ligand-receptor interactions using tools like CellPhoneDB or CellChat.
+- Tools such as `Monocle3` or `Slingshot` perform trajectory inference by learning a graph of cells and fitting trajectories through the embedding (such as UMAP).
+- A typical trajectory analysis involves creating a `cell_data_set` object, reducing dimensions, clustering, learning a graph, and ordering cells.
+- The inferred pseudotime values can be visualized on the UMAP to show how cells transition from an origin state to a target state.
+
+# 12. Cell-Cell Communication (`07_CellChat.Rmd`)
+Cell-cell communication analysis predicts potential ligand-receptor interactions between cell types or clusters. This provides insight into how cells may influence each other through secreted factors and signaling pathways.
+
+- Tools such as `CellPhoneDB` and `CellChat` compare known ligand-receptor pairs with the expression data to identify enriched interactions.
+- Results can be visualized using network plots or chord diagrams to highlight which cell types send or receive signals.
+- In a typical CellChat workflow, the object is created, interactions are inferred, and results are visualized.
+- This analysis extends the interpretation of clusters by linking them through predicted signaling interactions, revealing potential mechanisms of coordination in the tissue microenvironment.
