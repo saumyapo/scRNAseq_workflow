@@ -98,7 +98,7 @@ Integration is the process of removing batch effects that exist in the data whic
 There are many integration packages that exist, including Seurat's anchor based integration. There are pros and cons to every approach but Harmony is used industry wide due to being really fast and accurate.
 
 ```{r}
-seurat_object <- RunHarmony(seurat_object, "sample_names")
+seurat_object <- RunHarmony(seurat_object, group.by.vars = "sample_names")
 ```
 
 
@@ -148,6 +148,7 @@ Common plot types include:
 2. Feature Plot: Displays gene expression spatially.
 3. Violin Plot: Shows expression distributions within clusters.
 4. Dot Plot: Summarizes gene expression across clusters.
+5. Heatmap: Sumarizes gene expression similar to a dotplot but in a coloured tile format.
 
 Visual inspection at each stage helps confirm whether filtering, clustering, and annotation align with biological expectations.
 
@@ -156,13 +157,19 @@ DimPlot(seurat_object, reduction = "umap", label = TRUE)
 FeaturePlot(seurat_object, features = c("CD3D", "MS4A1"))
 VlnPlot(seurat_object, features = c("CD3D"))
 DotPlot(seurat_object, features = c("CD3D", "MS4A1", "LYZ"))
+Heatmap()
 ```
 
 ## 9.2. Iterative Refinement
 Interpretation is iterative. Clusters may be split further or merged based on marker genes and biological context. Cells with ambiguous identity can be excluded. Biological hypotheses can be developed from the marker genes and cluster relationships.
 
-# 10. Downstream Analyses
+# 10. Gene Set Enrichment Analysis - GSEA (`05_GSEA_Clusterprofiler.Rmd`)
+GSEA
+
 Beyond the core workflow, additional analyses include:
 
-1. Trajectory Inference: Ordering cells along developmental trajectories using tools such as Monocle or Slingshot.
-2. Cell-Cell Communication: Predicting ligand-receptor interactions using tools like CellPhoneDB or CellChat.
+# 11. Trajectory Inference
+Ordering cells along developmental trajectories using tools such as Monocle or Slingshot.
+
+# 12. Cell-Cell Communication (`06_CellChat.Rmd`)
+Predicting ligand-receptor interactions using tools like CellPhoneDB or CellChat.
