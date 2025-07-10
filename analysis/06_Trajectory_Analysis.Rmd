@@ -1,0 +1,252 @@
+---
+title: "Trajectory Analysis"
+author: "Saumya"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: cosmo
+#    number_sections: true # Adds numbers to headers
+    css: styles.css
+    code_folding: hide
+---
+
+```{r, echo=FALSE}
+colorize <- function(text, color) {
+  sprintf('<span style="color:%s">%s</span>', color, text)
+}
+```
+
+<!-- Information of Used Library -->
+### Information of Used R Libraries
+
+The following R libraries were used to process the data and produce this report.
+
+dplyr: `r packageVersion('dplyr')`, 
+
+Seurat: `r packageVersion('Seurat')`, 
+
+patchwork: `r packageVersion('patchwork')`, 
+
+ggplot2: `r packageVersion('ggplot2')`, 
+
+cowplot: `r packageVersion('cowplot')`,
+
+Monocle3 : `r packageVersion('monocle3')`,
+
+SeuratWrappers: `r packageVersion('SeuratWrappers')`
+
+# Trajectory/Pseudotime Analysis using Monocle3
+
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Load the Seurat object from RDS file
+seurat_object <- readRDS("seurat_obj.RDS")
+
+# Join layers if the object has multiple layers (e.g., from integration) for Seurat V5
+seurat_object <- JoinLayers(seurat_object)
+
+# Create a working copy of the Seurat object
+my.so <- seurat_object
+
+# Project PCA dimensions to the whole dataset for consistency
+my.so <- ProjectDim(my.so, reduction = "pca")
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Create an expression matrix from the Seurat object
+# Extract raw count data from the RNA assay
+expression_matrix <- GetAssayData(my.so, assay = "RNA", layer = "counts")
+
+# Get cell metadata (cell annotations, cluster info, etc.)
+cell_metadata <- my.so@meta.data
+cell_metadata <- cell_metadata[colnames(expression_matrix), ]
+
+# Verify that cell identifiers match between expression matrix and metadata
+# This is crucial for Monocle3 to work properly
+
+if (isTRUE(all.equal(colnames(expression_matrix), rownames(cell_metadata)))) {
+  print("Cell identifiers match")
+} else {
+  print(sprintf("Cell identifier mismatch - %i cells in expression matrix, %i cells in metadata",
+                ncol(expression_matrix), nrow(cell_metadata)))
+  print("If the counts are equal, sort differences will throw this error")
+}
+```
+
+```{r,eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Create gene annotations for Monocle3
+# Extract gene names from the Seurat object and create a data frame
+
+gene_annotation <- data.frame(gene_short_name = rownames(my.so@assays$RNA), row.names = rownames(my.so@assays$RNA))
+
+# Verify that gene identifiers match between expression matrix and gene annotations
+# This ensures all genes are properly labeled in Monocle3
+if (all.equal(rownames(expression_matrix), rownames(gene_annotation))) {
+  print(sprintf("Gene identifiers all match"))
+} else {
+  print(sprintf("Gene identifier mismatch - %i genes in expression matrix, %i gene in gene annotation",
+                nrow(expression_matrix), nrow(gene_annotation)))
+  print("If the counts are equal, sort differences will throw this error")
+}
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Create a Monocle3 cell data set (CDS) object from Seurat data
+# This converts Seurat object format to Monocle3 format for trajectory analysis
+
+cds <- new_cell_data_set(expression_matrix,
+                            cell_metadata = cell_metadata,
+                            gene_metadata = gene_annotation)
+```
+
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Transfer Seurat embeddings and cluster info to Monocle3 object
+# This ensures Monocle3 uses the same PCA and UMAP coordinates as Seurat
+
+reducedDim(cds, type = "PCA") <- my.so@reductions$pca@cell.embeddings 
+cds@reduce_dim_aux$prop_var_expl <- my.so@reductions$pca@stdev
+
+# Optional: Plot PCA variance explained to verify the transfer worked correctly
+# plot_pc_variance_explained(cds)
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Transfer UMAP coordinates from Seurat to Monocle3
+# This ensures both objects use the same UMAP visualization
+
+cds@int_colData@listData$reducedDims$UMAP <- my.so@reductions$umap@cell.embeddings
+
+# Plot cells using Monocle3's plotting function
+# This should show the same UMAP as Seurat
+
+plot_cells(cds)
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Transfer Seurat cluster information to Monocle3 object
+# This ensures Monocle3 uses the same clustering as Seurat
+
+cds@clusters$UMAP_so$clusters <- my.so@meta.data$seurat_clusters
+
+# Perform clustering in Monocle3 using the transferred cluster information
+# This creates a consistent clustering between Seurat and Monocle3
+
+cds <- cluster_cells(cds, reduction_method = "UMAP", partitioning_method = "seurat_clusters")
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Save the Monocle3 cell data set object for later use
+# This preserves all the clustering and embedding information
+saveRDS(cds, file = "trajectory_cds.RDS")
+```
+
+## Seurat and Monocle3 clusters {.tabset}
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Load the Seurat object for visualization
+my.so <- readRDS("seurat_obj.RDS")
+
+# Load the Monocle3 cell data set object
+cds <- readRDS("trajectory_cds.RDS")
+
+# Plot clusters for comparison between Seurat and Monocle3 clustering
+cat('###',"Seurat Clusters",' \n')
+# Create UMAP plot colored by Seurat clusters with labels
+DimPlot(my.so, reduction = "umap", group.by = "seurat_clusters", label = TRUE, raster = FALSE)+ggtitle("Seurat Cluster")
+cat('\n \n')
+cat('###',"Monocle3 Clusters",' \n')
+# Create UMAP plot colored by Monocle3 clusters without labels
+plot_cells(cds, color_cells_by = "cluster", label_cell_groups=FALSE)+ggtitle("Monocle Cluster")
+cat('\n \n')
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Learn the trajectory graph from the cell data set
+# This constructs a graph representing cell state transitions
+# The graph will be used to order cells along developmental trajectories
+
+cds <- learn_graph(cds)
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Extract the Seurat cluster information from the Monocle3 object
+# This transfers cluster labels from Seurat to Monocle3 for consistency
+
+cds@clusters$seurat_clusters <- my.so@meta.data$seurat_clusters
+
+# Identify the root cells for trajectory analysis
+# Root cells define the starting point of the trajectory
+
+root = c("0")
+root_cells <- rownames(subset(colData(cds), seurat_clusters == root))
+
+# Print cluster distribution and number of root cells for verification
+print(table(cds@clusters$seurat_clusters))
+print(length(root_cells))
+```
+
+```{r, eval=FALSE,echo=FALSE, message=FALSE, warning=FALSE}
+# Order cells in the Monocle3 object using the identified root cells
+# This assigns pseudotime values to each cell based on distance from root
+# Root cells get pseudotime = 0, cells further along trajectory get higher values
+
+cds <- order_cells(cds, root_cells = root_cells)
+```
+
+```{r, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+# Save the final Monocle3 object with trajectory information
+# This includes the learned graph and is ready for pseudotime analysis
+
+saveRDS(cds, file = "monocle3_cds.RDS")
+```
+
+## Monocle3 Pseudotime Analysis {.tabset}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Plot cells with pseudotime values
+
+cds <- readRDS("monocle3_cds.RDS")
+
+# Create UMAP plot colored by pseudotime values
+# Cells are colored based on their pseudotime (developmental progression)
+
+seurat_pseudotime <- plot_cells(cds, reduction_method = "UMAP", cell_size = 0.5, color_cells_by = "pseudotime") + ggtitle("Monocle3 Pseudotime Analysis")
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Plot cells colored by their cell type/cluster identity
+# This shows how different cell types are distributed along the trajectory
+
+celltype_pseudotime <- plot_cells(
+  cds, 
+  reduction_method = "UMAP", 
+  cell_size = 0.5, 
+  color_cells_by = "seurat_clusters", 
+  label_cell_groups = FALSE
+) + theme(legend.position = "right") + ggtitle("Pseudotime Analysis with Cell Type")
+```
+
+```{r, results='asis', echo=FALSE, message=FALSE, warning=FALSE}
+# Display pseudotime analysis results in the report
+cat('###',"Pseudotime",' \n')
+# Show the pseudotime plot (cells colored by developmental progression)
+print(seurat_pseudotime)
+cat('\n \n')
+cat('###',"Pseudotime with Cell Type",' \n')
+# Show the cell type plot (cells colored by cluster identity)
+print(celltype_pseudotime)
+cat('\n \n')
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Save pseudotime plot as PDF file
+
+pdf(paste("trajectory_analysis.pdf"), width=10, height=8, useDingbats = FALSE)
+print(seurat_pseudotime)
+print(celltype_pseudotime)
+dev.off()
+```
