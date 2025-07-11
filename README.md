@@ -11,6 +11,12 @@ Highly recommend: [Seurat Guided Tutorial](https://satijalab.org/seurat/articles
 
 Great bioinformatics tutorial YouTube channel: [Collection of Online Tutorials](https://www.youtube.com/@Collection_of_online_tutorials/featured)
 
+## Folder breakdown
+1. `analysis` contains scripts for Seurat V5 scRNA-seq workflow from loading the files in to annotation, GSEA and optional analysis like trajectory analysis and cell-cell communication.
+2. `RShiny` contains RShiny code that allows the user to interactively view Seurat or CellChat data.
+3. `scripts` contains miscellaneous scripts related to analysis, like Seurat Object to AnnData conversion, or making some plots of interest.
+
+
 ## Citations
 1. Seurat v5: <br>
 Hao, Y., Stuart, T., Kowalski, M.H. et al. Dictionary learning for integrative, multimodal and scalable single-cell analysis. Nat Biotechnol 42, 293–304 (2024). https://doi.org/10.1038/s41587-023-01767-y
