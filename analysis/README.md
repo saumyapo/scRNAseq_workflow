@@ -1,4 +1,4 @@
-Markdown has an overview on the basics of scRNA-seq analysis and the code is very generic as a means to explain with example. The actual code is present in each file n mentioned at the respective stages of the analysis.
+Markdown has an overview on the basics of scRNA-seq analysis and the code is very generic as a means to explain with example. The actual code is present in each file mentioned at the respective stages of the analysis.
 
 Highly recommend: [Seurat Guided Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial#assigning-cell-type-identity-to-clusters)
 
