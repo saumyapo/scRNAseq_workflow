@@ -9,7 +9,7 @@
 
 Highly recommend: [Seurat Guided Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial#assigning-cell-type-identity-to-clusters)
 
-Great bioinformatics tutorial YouTube channel : [Collection of Online Tutorials](https://www.youtube.com/@Collection_of_online_tutorials/featured)
+Great bioinformatics tutorial YouTube channel: [Collection of Online Tutorials](https://www.youtube.com/@Collection_of_online_tutorials/featured)
 
 ## Citations
 1. Seurat v5: <br>
