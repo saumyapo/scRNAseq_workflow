@@ -1,5 +1,9 @@
 Markdown has an overview on the basics of scRNA-seq analysis and the code is very generic as a means to explain with example. The actual code is present in each respective file of the stage which has been mentioned at the respective stages of the analysis.
 
+Highly recommend: [Seurat Guided Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial#assigning-cell-type-identity-to-clusters)
+
+Great Bioinformatics YouTube channel that has content beyond Seurat: [Collection of Online Tutorials](https://www.youtube.com/@Collection_of_online_tutorials/featured)
+
 # 1. Introduction to Single-Cell RNA Sequencing
 
 Single-cell RNA sequencing (scRNA-seq) is a technique used to measure the gene expression profiles of individual cells. Unlike bulk RNA-seq, which provides an average signal across many cells, scRNA-seq captures the cellular heterogeneity within a tissue or sample. This enables the discovery of distinct cell types, rare cell populations, and dynamic changes in cell states.
