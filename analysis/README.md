@@ -206,6 +206,9 @@ Trajectory inference arranges single cells along a pseudotime axis to infer dyna
 - The inferred pseudotime values can be visualized on the UMAP to show how cells transition from an origin state to a target state.
 
 # 13. Cell-Cell Communication (`07_CellChat.Rmd`)
+
+Strongly recommend following along the YouTube tutorial : [CellChat Tutorial](https://youtu.be/mOSG31aaj14?feature=shared)
+
 Cell-cell communication analysis predicts potential ligand-receptor interactions between cell types or clusters. This provides insight into how cells may influence each other through secreted factors and signaling pathways.
 
 - Tools such as `CellPhoneDB` and `CellChat` compare known ligand-receptor pairs with the expression data to identify enriched interactions.
