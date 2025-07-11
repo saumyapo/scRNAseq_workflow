@@ -164,7 +164,21 @@ Heatmap()
 ## 9.2. Iterative Refinement
 Interpretation is iterative. Clusters may be split further or merged based on marker genes and biological context. Cells with ambiguous identity can be excluded. Biological hypotheses can be developed from the marker genes and cluster relationships.
 
-# 10. Gene Set Enrichment Analysis - GSEA (`05_GSEA_Clusterprofiler.Rmd`)
+# 10. Subset Analysis (`04_Subset_Clustering.Rmd`)
+Subsetting the data allows to focus on the cell type(s) of interest by isolating it from the rest of the dataset. This is done using the same `subset()` function but uses the `seurat_clusters` as an identifier or a new annotated cell type column.
+
+```{r}
+glia_subset <- subset(seurat_object, idents = "2")
+tcell_subset <- subset(seurat_object, idents = c("CD4 T", "CD8 T", "gDT"))
+```
+
+- The subsetted data needs to go through a lot of the same processing as the main object. QC is not required since we are subsetting the data post QC, but the data needs to be re-normalized and re-scaled. This is because both normalization and scaling are relative to the entire dataset, and once we have reduced that to a small fraction of the original, we need to adjust gene expression relative to the smaller subset.
+- Integration is not required since the dataset has already been integrated, but sometimes the data still shows batch effect. This can be checked by plotting a `DimPlot()` on the samples, and if they are not inter-mixed well, then the subset might need re-integration.
+- After this the subset can be reclustered using the same steps as the main object for cellular subtypes (e.g, myeloid cells to classical monocytes, inflammatory macrophages, dendritic cells, etc.)
+- Condition-wise comparisons are also interesting here since the difference between condition and healthy control can be studied in detail in each subcluster.
+- All the further analysis like GSEA, trajectory analysis, cellchat can be done on the subsetted data as well.
+
+# 11. Gene Set Enrichment Analysis - GSEA (`05_GSEA_Clusterprofiler.Rmd`)
 Gene Set Enrichment Analysis (GSEA) is used to identify whether specific biological pathways or gene sets are overrepresented in differentially expressed genes. This helps to interpret clusters in terms of known biological functions rather than individual genes.
 
 - In the workflow, `clusterProfiler` is a commonly used R package for running GSEA on marker genes. Significant pathways can be visualized with bar plots or dot plots to show enrichment scores and adjusted p-values.
@@ -180,14 +194,14 @@ This ranks genes by log fold-change or a similar statistic and tests for enrichm
 
 Beyond the core workflow, additional analyses include:
 
-# 11. Trajectory Inference (`06_Trajectory_Analysis.Rmd`)
+# 12. Trajectory Inference (`06_Trajectory_Analysis.Rmd`)
 Trajectory inference arranges single cells along a pseudotime axis to infer dynamic biological processes such as cell differentiation or activation. This analysis is particularly useful for studying developmental lineages or transitional cell states that are not captured by discrete clusters alone.
 
 - Tools such as `Monocle3` or `Slingshot` perform trajectory inference by learning a graph of cells and fitting trajectories through the embedding (such as UMAP).
 - A typical trajectory analysis involves creating a `cell_data_set` object, reducing dimensions, clustering, learning a graph, and ordering cells.
 - The inferred pseudotime values can be visualized on the UMAP to show how cells transition from an origin state to a target state.
 
-# 12. Cell-Cell Communication (`07_CellChat.Rmd`)
+# 13. Cell-Cell Communication (`07_CellChat.Rmd`)
 Cell-cell communication analysis predicts potential ligand-receptor interactions between cell types or clusters. This provides insight into how cells may influence each other through secreted factors and signaling pathways.
 
 - Tools such as `CellPhoneDB` and `CellChat` compare known ligand-receptor pairs with the expression data to identify enriched interactions.
