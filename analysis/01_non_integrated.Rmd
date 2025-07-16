@@ -59,35 +59,44 @@ projectName <- "Seurat"
 h5_string <- "_filtered_feature_bc_matrix.h5"
 ```
 
-```{r,  eval=FALSE, message = FALSE, results= FALSE, warning=FALSE}
-# Define filenames and path
-filenames <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
+```{r,  eval=FALSE,  message = FALSE, results= FALSE, warning=FALSE}
+# Get all .h5 files
+all_files <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
 
-# Check if the path for the files is right
-filenames
-
-# Create a list to store Seurat objects
+# Initialize
 seurat_list <- list()
- 
-# Loop through filenames and create Seurat objects
-for (i in 1:length(filenames)) {
-  raw_data <- Read10X_h5(filenames[i], use.names = TRUE, unique.features = TRUE)
-  seurat_obj <- CreateSeuratObject(counts = raw_data,
-                                    project = projectName,
-                                   min.cells = 3,
-                                   min.features = 200)
-# Add sample name to orig.ident
- seurat_obj$orig.ident <- sampleNames[i]
 
-# Store in the list
- seurat_list[[i]] <- seurat_obj
+# Loop through sample names
+for (sample in sampleNames) {
+  # Find the file for sample
+  matched_file <- grep(sample, all_files, value = TRUE)
+  print(matched_file)
+  if (length(matched_file) == 0) {
+    stop(paste("No file found for sample:", sample))
+  } else if (length(matched_file) > 1) {
+    warning(paste("Multiple files found for sample:", sample, "- using first:", matched_file[1]))
+    matched_file <- matched_file[1]
+  }
+  
+  # Read and create Seurat object
+  raw_data <- Read10X_h5(matched_file, use.names = TRUE, unique.features = TRUE)
+  seurat_obj <- CreateSeuratObject(
+    counts = raw_data,
+    project = projectName,
+    min.cells = 3,
+    min.features = 200
+  )
+  
+  # Add sample name
+  seurat_obj$orig.ident <- sample
+  
+  # Store it
+  seurat_list[[sample]] <- seurat_obj
 }
- 
-# Merge all Seurat objects into one
-combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
- 
-combined_data@meta.data$sample_names <- combined_data@meta.data$orig.ident
 
+# Merge all Seurat objects
+combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
+combined_data$sample_names <- combined_data$orig.ident
 ```
 
 ```{r, eval= FALSE, results = FALSE, message=FALSE, warning=FALSE}
