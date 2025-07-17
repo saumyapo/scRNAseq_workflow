@@ -279,6 +279,32 @@ Idents(data.combined) <- data.combined$cluster_label
 saveRDS(data.combined, "../RDS/data_umap_33_clusters.RDS")
 ```
 
+```{r, results = FALSE, eval = FALSE,  message=FALSE, warning=FALSE}
+# Calculate cell frequencies for each sample in each cluster. 
+# Extract metadata
+metadata <- data.combined@meta.data
+
+# Define the clustering resolution column names. Pick just one or any that are of interest
+resolutions <- c("RNA_snn_res.0.1","RNA_snn_res.0.2","RNA_snn_res.0.3","RNA_snn_res.0.4", "RNA_snn_res.0.5", "RNA_snn_res.0.6")
+
+# Initialize an empty string to store CSV content
+output_file <- "../csvs/cell_count_distribution_all_resolutions.csv"
+
+# Loop through each resolution and compute sample-wise cell counts
+for (res in resolutions) {
+  # Create a table of sample-wise cluster counts
+  count_table <- as.data.frame(table(metadata$sample_names, metadata[[res]]))
+  colnames(count_table) <- c("Sample", "Cluster", "Cell_Count")
+  count_table$Resolution <- res  # Add resolution as a column
+
+  # Write to CSV (append mode, keeping headers for each resolution)
+  write.table(count_table, output_file, append = TRUE, sep = ",", row.names = FALSE, col.names = TRUE, quote = FALSE)
+
+}
+
+# Print confirmation
+cat("CSV file successfully saved as", output_file, "\n")
+```
 
 # Cell Count Distribution in Clusters {.tabset}
 
