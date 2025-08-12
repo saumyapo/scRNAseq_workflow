@@ -1,0 +1,20 @@
+library(Seurat)
+library(openxlsx)
+
+# Genes of interest to extract expression levels for
+genes_of_interest <- c("MS4A1", "CD19”)
+
+# Average expression per cell type, based on annotations
+avg_expr <- AverageExpression(
+  seurat_object,
+  features = genes_of_interest,
+  group.by = “annotations”,
+  assays = "RNA",
+  slot = "data"
+)
+
+# Convert to a data frame
+avg_expr_df <- as.data.frame(avg_expr$RNA)
+
+# Write to excel
+write.xlsx(avg_expr_df, file = "gene_normalized_avg_by_celltype.xlsx", rowNames = TRUE)
