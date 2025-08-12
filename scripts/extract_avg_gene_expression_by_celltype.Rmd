@@ -5,7 +5,7 @@ library(openxlsx)
 genes_of_interest <- c("MS4A1", "CD19”)
 
 # Average expression per cell type, based on annotations
-avg_expr <- AverageExpression(
+avg_expr <- AggregateExpression(
   seurat_object,
   features = genes_of_interest,
   group.by = “annotations”,
