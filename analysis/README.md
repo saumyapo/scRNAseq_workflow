@@ -18,7 +18,7 @@ Seurat is an R package designed for the analysis and exploration of single-cell 
 Scanpy is a comparable Python framework that uses the same principles but stores data in an `anndata` object. Both frameworks implement similar workflows; choice depends on the preferred programming language.
 
 
-# 3. Data Import and Quality Control (`01_non_integrated.Rmd`)
+# 3. Data Import and Quality Control (`01_QC_non_integrated.Rmd`)
 
 ## 3.1. Reading Data
 
