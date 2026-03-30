@@ -59,40 +59,90 @@ projectName <- "Seurat"
 h5_string <- "_filtered_feature_bc_matrix.h5"
 ```
 
-```{r,  eval=FALSE,  message = FALSE, results= FALSE, warning=FALSE}
-# Get all .h5 files
-all_files <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE)
+```{r, results = FALSE, message=FALSE, warning=FALSE, eval = FALSE}  
+# Get all .h5 files once
+all_files <- list.files(path = data_dir, pattern = "\\.h5$", full.names = TRUE, ignore.case = TRUE)
 
 # Initialize
 seurat_list <- list()
 
-# Loop through sample names
+pdf("../../pdfs/all_celltypes/qc/raw_SoupX_diagnostic_plots.pdf", width = 8, height = 6)
+
 for (sample in sampleNames) {
-  # Find the file for sample
-  matched_file <- grep(sample, all_files, value = TRUE)
-  print(matched_file)
-  if (length(matched_file) == 0) {
-    stop(paste("No file found for sample:", sample))
-  } else if (length(matched_file) > 1) {
-    warning(paste("Multiple files found for sample:", sample, "- using first:", matched_file[1]))
-    matched_file <- matched_file[1]
-  }
   
-  # Read and create Seurat object
-  raw_data <- Read10X_h5(matched_file, use.names = TRUE, unique.features = TRUE)
-  seurat_obj <- CreateSeuratObject(
-    counts = raw_data,
-    project = projectName,
-    min.cells = 3,
-    min.features = 200
-  )
+  filtered_file <- file.path(data_dir, paste0(sample, "_filtered_feature_bc_matrix.h5"))
+  raw_file  <- file.path(data_dir, paste0(sample, "_raw_feature_bc_matrix.h5"))
+
+  matched_filtered <- filtered_file
+  matched_raw      <- raw_file
+
+  message("Using raw: ", matched_raw)
+  message("Using filtered: ", matched_filtered)
+   
+   
+    tod <- Read10X_h5(matched_raw, use.names = TRUE, unique.features = TRUE)       # table of droplets (raw)
+    toc <- Read10X_h5(matched_filtered, use.names = TRUE, unique.features = TRUE)  # table of counts (filtered)
+
+    # Ensure genes/order match between tod and toc. If not, align toc to tod
+    if (!all(rownames(tod) == rownames(toc))) {
+      common_genes <- intersect(rownames(tod), rownames(toc))
+      if (length(common_genes) == 0) stop("No overlapping genes between raw and filtered for sample: ", sample)
+      # Subset and reorder both to common_genes (tod first to preserve droplet gene order)
+      tod <- tod[common_genes, , drop = FALSE]
+      toc <- toc[common_genes, , drop = FALSE]
+      message("Reordered/subset raw/filtered to common genes for sample ", sample)
+    }
+
+    # Construct SoupChannel and run estimation + correction
+    sc <- SoupChannel(tod, toc, calcSoupProfile = FALSE)
+    sc = estimateSoup(sc)
+
+   tmp_seurat <- CreateSeuratObject(counts = toc, project = paste0(projectName, "_tmp"),min.cells = 0, min.features = 0)
+
+    tmp_seurat <- NormalizeData(tmp_seurat, normalization.method = "LogNormalize", scale.factor = 10000)
+    tmp_seurat <- FindVariableFeatures(tmp_seurat, selection.method = "vst", nfeatures = 2000)
+    tmp_seurat <- ScaleData(tmp_seurat, verbose = TRUE)
+    
+    # PCA / neighbors / clustering
+    tmp_seurat <- RunPCA(tmp_seurat, npcs = 30, verbose = FALSE)
+    tmp_seurat    <- RunUMAP(tmp_seurat, dims = 1:30, verbose = F)
+    tmp_seurat <- FindNeighbors(tmp_seurat, dims = 1:30, verbose = FALSE)
+    tmp_seurat <- FindClusters(tmp_seurat, verbose = FALSE)
+    
+    meta    <- tmp_seurat@meta.data
+    umap    <- tmp_seurat@reductions$umap@cell.embeddings
+
+    sc  <- setClusters(sc, setNames(meta$seurat_clusters, rownames(meta)))
+    sc  <- setDR(sc, umap)
+    
+    plot.new()
+    title(main = paste("Sample:", sample), cex.main = 1.5, col.main = "black")
   
-  # Add sample name
-  seurat_obj$orig.ident <- sample
-  
-  # Store it
-  seurat_list[[sample]] <- seurat_obj
+    sc <- autoEstCont(sc)
+    
+    # Calculate adjusted counts (method default 'subtraction' or choose 'multinomial')
+    corrected <- adjustCounts(sc, roundToInt = TRUE)  # returns a corrected counts matrix
+    
+    # Build Seurat object from corrected counts
+    seurat_obj <- CreateSeuratObject(
+      counts = corrected,
+      project = projectName,
+      min.cells = 3,
+      min.features = 200
+    )
+
+    # Add metadata: original sample name
+    seurat_obj$orig.ident <- sample
+    
+    # Save raw counts into an assay:
+    toc_matched <- toc[, colnames(corrected)]   # subset toc to match corrected
+    seurat_obj[["RNA"]]$original_counts <- toc_matched
+
+    seurat_list[[sample]] <- seurat_obj
+    next
 }
+
+dev.off()
 
 # Merge all Seurat objects
 combined_data <- merge(seurat_list[[1]], y = seurat_list[-1], add.cell.ids = sampleNames)
@@ -124,10 +174,96 @@ unique(combined_data$condition)
 saveRDS(combined_data, file = paste("../RDS/data_combined_raw.RDS"))
 ```
 
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+data <- readRDS("../RDS/data_combined_raw.RDS")
+
+# Doublet detection using scDblfinder
+DefaultAssay(data) <- "RNA"
+set.seed(100)
+
+sce <- data
+
+#scDblFinder
+#Since there are multiple layers and sce needs to be 1
+sce_full <- data %>% JoinLayers() %>% as.SingleCellExperiment()
+set.seed(100)
+sce_full <- scDblFinder(sce_full, samples = "sample_names")
+```
+
+
+```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#scds on same object
+set.seed(1234)
+sce_full <- cxds(sce_full)
+sce_full <- bcds(sce_full)
+sce_full <- cxds_bcds_hybrid(sce_full, estNdbl = TRUE)
+```
+
+
+```{r, eval= FALSE, results = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#transfer metadata
+dbl_meta <- as.data.frame(colData(sce_full)) %>%
+  dplyr::select(scDblFinder.class, cxds_score, bcds_score,
+                hybrid_score, cxds_call, bcds_call, hybrid_call)
+data <- AddMetaData(data, dbl_meta)
+```
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+saveRDS(data, file = paste("../RDS/data_combined_raw.RDS"))
+```
+
+```{r}
+# consensus filtering — remove only if BOTH agree
+data$doublet_consensus <- data$scDblFinder.class == "doublet" & data$hybrid_call == TRUE
+# Remove doublets
+data_singlet <- subset(data, doublet_consensus == FALSE)
+```
+
+```{r, eval = FASLE, results = FALSE, message=FALSE, warning=FALSE}
+saveRDS(data_singlet, "../RDS/data_dblt_filt_combined_raw.RDS")
+```
+
+# QC: Checking mitochondrial and ribosomal gene percentages {.tabset}
+
+Cells with > 10% mitochondrial percentage and nFeature_RNA <200 OR >2500 are generally filtered. 
+
+Note: nFeature_RNA is the total number of genes detected in each cell. It counts how many genes show a non-zero expression level for a given cell, and <200 is a low quality cell, and >2500 is assumed to be a doublet due to higher than normal expression levels, but data varies. Make sure to check your data and determine appropriate cutoffs to not lose real biological information.
+
+```{r, results = FALSE, message=FALSE, warning=FALSE}
+# read singlets RDS
+data <- readRDS("../RDS/data_dblt_filt_combined_raw.RDS")
+
+# Check mitochondrial gene names
+gene_names <- rownames(data)
+mt_genes <- grep("^MT-", gene_names, value = TRUE)
+print(mt_genes)
+
+# Calculate mitochondrial gene percentage
+data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
+ 
+# Add new column with mitochondrial percentage information
+data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
+ 
+
+# Check ribosomal gene names
+gene_names <- rownames(data)
+rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
+print(rp_genes)
+
+# Calculate ribosomal gene percentage
+data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
+
+# Add new column with ribosomal percentage information
+data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
+```
+
+```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Save RDS with mitochondrial and ribosomal percentages
+saveRDS(data, file = paste("../RDS/data_dblt_filt_combined_raw.RDS"))
+```
 
 ```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
 # Standard Seurat workflow
-data <- readRDS("../RDS/data_combined_raw.RDS")
+data <- readRDS("../RDS/data_dblt_filt_combined_raw.RDS")
 
 # Standard normalisation workflow
 data <- NormalizeData(data, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -162,43 +298,6 @@ DimPlot(data, reduction = "umap", group.by = "condition", raster = FALSE) + ggti
 cat(" \n \n")
 ```
 
-
-# QC: Checking mitochondrial and ribosomal gene percentages {.tabset}
-
-Cells with > 10% mitochondrial percentage and nFeature_RNA <200 OR >2500 are generally filtered. 
-
-Note: nFeature_RNA is the total number of genes detected in each cell. It counts how many genes show a non-zero expression level for a given cell, and <200 is a low quality cell, and >2500 is assumed to be a doublet due to higher than normal expression levels, but data varies. Make sure to check your data and determine appropriate cutoffs to not lose real biological information.
-
-```{r, results = FALSE, message=FALSE, warning=FALSE}
-# Check mitochondrial gene names
-gene_names <- rownames(data)
-mt_genes <- grep("^MT-", gene_names, value = TRUE)
-print(mt_genes)
-
-# Calculate mitochondrial gene percentage
-data[["percent.mt"]] <- PercentageFeatureSet(data, pattern = "^MT-")
- 
-# Add new column with mitochondrial percentage information
-data$mt_label <- factor(ifelse(data$percent.mt > 20, "Above 20%", "Below 20%"))
- 
-
-# Check ribosomal gene names
-gene_names <- rownames(data)
-rp_genes <- grep("^RP[SL]", gene_names, value = TRUE)
-print(rp_genes)
-
-# Calculate ribosomal gene percentage
-data[["percent.rp"]] <- PercentageFeatureSet(data, pattern = "^RP[SL]")
-
-# Add new column with ribosomal percentage information
-data$rp_label <- factor(ifelse(data$percent.rp > 10, "Above 10%", "Below 10%"))
-```
-
-```{r, eval = FALSE, results = FALSE, message=FALSE, warning=FALSE}
-# Save RDS with mitochondrial and ribosomal percentages
-saveRDS(data, file = paste("../RDS/data_combined_raw_umap.RDS"))
-```
-
 ```{r, results = 'asis', message=FALSE, warning=FALSE}
 data <- readRDS("../RDS/data_combined_raw_umap.RDS")
 
@@ -212,7 +311,6 @@ DimPlot(data, reduction = "umap", group.by = "rp_label", raster = FALSE) + ggtit
 VlnPlot(data, features = c("percent.rp"), pt.size = 0.0, group.by = "sample_names") + ggtitle ("Percentage of Ribosomal Genes") + theme(legend.position = "none") + coord_cartesian(ylim = c(0, 25))
 cat(" \n \n")
 ```
-
 
 
 ```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE
