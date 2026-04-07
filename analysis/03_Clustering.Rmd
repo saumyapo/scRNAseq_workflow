@@ -387,3 +387,48 @@ summary_table <- data.frame(
 paged_table(summary_table)
 ```
 
+# Stacked bar plot with no p-values
+
+```{r}
+meta <- data.combined@meta.data %>%
+  filter(condition %in% c("NV", "UC"))
+
+per_sample_counts <- meta %>%
+  dplyr::count(sample_names, cluster_label) %>%
+  group_by(sample_names) %>%
+  mutate(total_cells_sample = sum(n),
+         pct_within_sample = n / total_cells_sample * 100) %>%
+  ungroup()
+
+sample_map <- meta %>% dplyr::select(sample_names, condition) %>% distinct()
+per_sample_counts <- per_sample_counts %>%
+  left_join(sample_map, by = "sample_names")
+
+summary_avg <- per_sample_counts %>%
+  group_by(condition, cluster_label) %>%
+  summarise(mean_pct = mean(pct_within_sample),
+            sd_pct   = sd(pct_within_sample),
+            n_donors = n(),
+            .groups = "drop")
+
+summary_avg$condition <- factor(summary_avg$condition,
+                                levels = c("NV", "UC"))
+
+colour_palette <- c("#E41A1CFF", "#377EB8FF", "#4DAF4AFF", "#984EA3FF", "#FF7F00FF", "#FFFF33FF", "#A65628FF", "#F781BFFF", "#999999FF")
+
+names(colour_palette) <- sort(unique(summary_avg$cluster_label))
+
+p <- ggplot(summary_avg, aes(x = condition, y = mean_pct, fill = cluster_label)) +
+  geom_col(position = "fill") +
+  scale_fill_manual(values = colour_palette) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(y = "Proportion per condition (%)", x = NULL, fill = NULL) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank())
+
+
+p <- p + theme(text = element_text(family = "Arial"))
+
+print(p)
+```
