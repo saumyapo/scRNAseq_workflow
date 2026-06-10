@@ -367,3 +367,144 @@ for (clust in names(plots_by_cluster)) {
 
 ```
 
+## NES Dot Plot
+
+```{r}
+# Clean pathway names for display
+clean_pathway_names <- function(x) {
+  x %>%
+    gsub("^GOBP_|^KEGG_|^REACTOME_", "", .) %>%
+    gsub("_", " ", .) %>%
+    stringr::str_to_title() %>%
+    stringr::str_wrap(width = 35)
+}
+
+plot_nes_dotplot_dual <- function(gsea_df,
+                                  subclusters = NULL,
+                                  pathways = NULL,
+                                  comparisons = NULL,
+                                  top_n = 15) {
+  
+  if (!is.null(subclusters)) {
+    gsea_df <- gsea_df %>% dplyr::filter(subcluster %in% subclusters)
+  }
+  if (!is.null(comparisons)) {
+    gsea_df <- gsea_df %>% dplyr::filter(comparison %in% comparisons)
+  }
+  
+  df_sig <- gsea_df %>% dplyr::filter(qvalue < 0.05)
+  
+  if (nrow(df_sig) == 0) {
+    return(ggplot() + annotate("text", x=0, y=0, label="No significant pathways") + theme_void())
+  }
+  
+  if (!is.null(pathways)) {
+    df_sig <- df_sig %>% dplyr::filter(Description %in% pathways)
+  } else {
+    df_sig <- df_sig %>%
+      group_by(subcluster, comparison) %>%
+      { bind_rows(
+        filter(., NES > 0) %>% arrange(desc(NES)) %>% head(top_n),
+        filter(., NES < 0) %>% arrange(NES) %>% head(top_n)
+      )} %>%
+      ungroup()
+  }
+  
+  # Clean labels and reorder
+  df_sig <- df_sig %>%
+    mutate(label = clean_pathway_names(Description))
+  
+  df_sig$label <- factor(
+    df_sig$label,
+    levels = unique(df_sig$label[order(df_sig$NES)])
+  )
+  
+  
+  subtitle_text <- unique(df_sig$subcluster) %>%
+    gsub("stromal_subset_cluster_", "", .) %>%
+    gsub("_CAR-T.*", "", .)
+  
+  ggplot(df_sig, aes(x = NES, y = label, size = setSize, color = qvalue)) +
+    geom_point(alpha = 0.85) +
+    facet_wrap(~comparison) +
+    scale_color_gradientn(
+      colors = c("navy", "orchid3", "firebrick"),   
+      trans  = "reverse",
+      name   = "Adj. p-value",
+      guide  = guide_colorbar(barwidth = 0.7, barheight = 5, ticks = TRUE)
+    ) +
+    scale_size_continuous(
+      name   = "Gene set size",
+      range  = c(3, 11),
+      breaks = c(20, 50, 100, 200)
+    ) +
+    scale_x_continuous(
+      expand = expansion(mult = c(0.05, 0.1)),
+      breaks = seq(-4, 4, by = 0.1)
+    ) +
+    theme_classic(base_size = 12) +
+    theme(
+      axis.text.y      = element_text(size = 9, lineheight = 0.85),
+      axis.text.x      = element_text(size = 9),
+      axis.title.x     = element_text(size = 10, margin = margin(t = 6)),
+      plot.title       = element_text(face = "bold", size = 12),
+      plot.subtitle    = element_text(size = 10, color = "grey40"),
+      plot.margin      = margin(t = 10, r = 20, b = 10, l = 10),   
+      legend.position  = "right",
+      legend.title     = element_text(size = 9),
+      legend.text      = element_text(size = 8),
+      strip.background = element_blank(),
+      strip.text       = element_text(size = 10, face = "bold"),
+      panel.border     = element_rect(colour = "black", fill = NA, linewidth = 0.4)
+    ) +
+    labs(
+      title = "Crypt Progenitors",
+      subtitle = subtitle_text,
+      x        = "Normalized Enrichment Score (NES)",
+      y        = NULL
+    )
+}
+```
+
+```{r}
+gsea_dir <- "../../csvs/epithelial/condition_GSEA/"
+pdf_dir <- "../../pdfs/epithelial/condition_GSEA/"
+
+# gsea_ec_nv <- read_excel(
+#   file.path(gsea_dir,
+#             "epithelial_subset_GSEA_EC_vs_NV.xlsx")
+# ) %>% as.data.frame()
+# 
+# gsea_ec_nv$comparison <- "Enterocolitis vs NV"
+
+gsea_ctrl_nv <- read_excel(
+  file.path(gsea_dir,
+            "epithelial_subset_GSEA_CTRL_vs_NV.xlsx")
+) %>% as.data.frame()
+
+gsea_ctrl_nv$comparison <- "Control vs NV"
+ 
+ combined_results <- bind_rows(gsea_ec_nv, gsea_ctrl_nv)
+
+```
+
+```{r}
+pathways_interest <- c(
+"GOBP_LEUKOCYTE_MEDIATED_CYTOTOXICITY",
+"REACTOME_INTERFERON_GAMMA_SIGNALING",
+"GOBP_CELL_KILLING",
+"GOBP_NEGATIVE_REGULATION_OF_VIRAL_PROCESS",
+"GOBP_REGULATION_OF_T_CELL_MEDIATED_CYTOTOXICITY",
+"GOBP_CYTOKINE_PRODUCTION",
+"GOBP_CAMP_MEDIATED_SIGNALING"
+)
+
+p <- plot_nes_dotplot_dual(
+  gsea_df = gsea_ctrl_nv,
+  subclusters = "epithelial_subset_cluster_Mature colonocytes_CTRL_vs_NV",
+  pathways = pathways_interest,
+  comparisons = c("Control vs NV")
+)
+
+print(p)
+```
