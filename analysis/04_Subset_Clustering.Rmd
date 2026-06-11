@@ -482,48 +482,230 @@ datatable(
 )
 ```
 
-```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
-# Code block to find condition wise markers for each subcluster of subsetted data
-
+```{r, eval = FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 # Read Seurat object
-subset_data <- readRDS("../RDS/subset_umap_10_clusters.RDS")
+filt_myeloid_subset <- readRDS("../../../RDS/myeloid/filt_myeloid_subset_umap_15_clusters.RDS")
 
-# Ensure RNA assay is set
-DefaultAssay(subset_data) <- "RNA"
-Idents(subset_data) <- "seurat_clusters"
+Idents(filt_myeloid_subset) <- "condition"
+filt_myeloid_subset <- JoinLayers(filt_myeloid_subset)
 
-# Store subcluster identities (backup)
-subset_data$subcluster <- Idents(subset_data)
+# Explicit directional comparisons
+pairwise_comparisons <- list(
+  c("CAR-T Enterocolitis", "CAR-T Control"),
+  c("CAR-T Enterocolitis", "NV"),
+  c("CAR-T Control", "NV")
+)
 
-# Set condition as active identity
-Idents(subset_data) <- "condition"
+overall_markers_list <- list()
 
-subset_data <- JoinLayers(subset_data)
+for (cmp in pairwise_comparisons) {
 
-# Create an empty list to store results
+  ident1 <- cmp[1]  # condition of interest
+  ident2 <- cmp[2]  # baseline
+
+  # Skip if either condition missing
+  if (!all(c(ident1, ident2) %in% unique(Idents(filt_myeloid_subset)))) {
+    next
+  }
+
+  message(paste0("Running all-cluster DEGs: ", ident1, " vs ", ident2))
+
+  data.markers <- FindMarkers(
+    filt_myeloid_subset,
+    ident.1 = ident1,
+    ident.2 = ident2,
+    only.pos = FALSE,
+    min.pct = 0.25,
+    logfc.threshold = 0.25
+  )
+
+  # FDR
+  data.markers$p_val_adj <- p.adjust(data.markers$p_val, method = "fdr")
+
+  # Gene column
+  data.markers$gene <- rownames(data.markers)
+  rownames(data.markers) <- NULL
+  data.markers <- data.markers[, c("gene", setdiff(colnames(data.markers), "gene"))]
+
+  # Add cluster label
+  overall_df <- as.data.frame(data.markers)
+  overall_df$cluster <- "all"
+  overall_df <- overall_df[, c("gene", setdiff(colnames(overall_df), "gene"))]
+
+  # Store
+  list_name <- paste0("all_", ident1, "_vs_", ident2)
+  overall_markers_list[[list_name]] <- overall_df
+
+  # Save CSV (matches your existing convention)
+  write.csv(
+    overall_df,
+    file = paste0(
+      "../../../csvs/myeloid/condition_DEGs/cluster_wise/",
+      "filt_myeloid_subset_all_",
+      ident1, "_vs_", ident2,
+      ".csv"
+    ),
+    row.names = FALSE
+  )
+}
+```
+
+
+```{r, results = FALSE, eval = FALSE, message=FALSE, warning=FALSE}
+# Read Seurat object
+filt_myeloid_subset <- readRDS("../../../RDS/myeloid/filt_myeloid_subset_umap_15_clusters.RDS")
+
+DefaultAssay(filt_myeloid_subset) <- "RNA"
+Idents(filt_myeloid_subset) <- "cluster_label"
+
+# Store subcluster identities
+filt_myeloid_subset$subcluster <- Idents(filt_myeloid_subset)
+
+
+filt_myeloid_subset <- JoinLayers(filt_myeloid_subset)
+
+# Condition vs Control (e.g, UC vs NV)
+pairwise_comparisons <- list(
+  c("CAR-T Enterocolitis", "CAR-T Control"),  # colitis vs control
+  c("CAR-T Enterocolitis", "NV"),             # colitis vs NV
+  c("CAR-T Control", "NV")                    # control vs NV
+)
+
+# Create empty list to store results
 markers_list <- list()
 
-# Loop over each subcluster
-for (cluster in unique(subset_data$subcluster)) {
-  # Subset data for the current subcluster
-   message("Processing Cluster: ", cluster)
-   subcluster_data <- subset(subset_data, subset = subcluster == cluster)
- 
-  # Set condition as active identity
+# Loop over subclusters
+for (cluster in unique(filt_myeloid_subset$subcluster)) {
+  message(paste0("Processing cluster: ", cluster))
+  
+
+  subcluster_data <- subset(filt_myeloid_subset, subset = subcluster == cluster)
+  
+  # if (length(unique(Idents(subcluster_data))) < 2) {
+  #   message(paste0("Skipping cluster ", cluster, " (not enough conditions present)"))
+  #   next
+  # }
+  
+  # Set condition as identity
   Idents(subcluster_data) <- "condition"
-
-  # Find all markers between Condition and Control within this subcluster
-  markers <- FindAllMarkers(subcluster_data, only.pos = FALSE, min.pct = 0.25, logfc.threshold = 0.25)
-   markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
-
-  # Store results with subcluster name
-   markers_list[[paste0("subset_subcluster_", cluster)]] <- markers
+  
+  # Loop over each pairwise comparison
+  for (cmp in pairwise_comparisons) {
+    ident1 <- cmp[1]  # condition of interest
+    ident2 <- cmp[2]  # baseline condition
+    
+    # Skip if either condition is missing in this subcluster
+    if (!all(c(ident1, ident2) %in% unique(Idents(subcluster_data)))) {
+      message(paste0("Skipping comparison ", ident1, " vs ", ident2, " in cluster ", cluster))
+      next
+    }
+    
+    message(paste0("  Comparing: ", ident1, " vs ", ident2))
+    
+    # Run FindMarkers
+    markers <- FindMarkers(
+      subcluster_data,
+      ident.1 = ident1,
+      ident.2 = ident2,
+      min.pct = 0.25,
+      logfc.threshold = 0.25
+    )
+    
+    # Add metadata
+    markers$cluster <- cluster
+    markers$comparison <- paste0(ident1, "_vs_", ident2)
+    markers$gene <- rownames(markers)
+    markers$p_val_adj <- p.adjust(markers$p_val, method = "fdr")
+    
+    # Store results
+    list_name <- paste0("filt_myeloid_subset_cluster_", gsub("/", "-", cluster), "_", ident1, "_vs_", ident2)
+    markers_list[[list_name]] <- markers
+  }
 }
 
-# Save results to CSV
+# Save results
 for (name in names(markers_list)) {
-  write.csv(markers_list[[name]], file=paste0("../csvs/subset/condition/", name, "_Condition_vs_Control.csv"))
+  write.csv(
+    markers_list[[name]],
+    file = paste0("../../../csvs/myeloid/condition_DEGs/cluster_wise//", name, ".csv"),
+    row.names = FALSE
+  )
 }
+```
+
+
+```{r}
+# Output directory
+agg_dir <- "../../../csvs/myeloid/condition_DEGs/"
+
+# Extract comparison names from markers_list
+# Keep everything after the cluster identifier
+comparisons <- unique(
+  sub("^.*cluster_[^_]+_", "", names(markers_list))
+)
+
+# Loop over each comparison
+for (cmp in comparisons) {
+
+  message(paste0("Aggregating comparison: ", cmp))
+
+  # Keys for this comparison
+  cmp_keys <- grep(paste0("_", cmp, "$"), names(markers_list), value = TRUE)
+
+  dfs_all_clusters <- lapply(cmp_keys, function(k) {
+
+    df <- as.data.frame(markers_list[[k]])
+
+    
+    cluster_label <- sub(
+      paste0("_", cmp, "$"),
+      "",
+      sub("^.*cluster_", "", k)
+    )
+
+    df$cluster <- cluster_label
+    df
+  })
+
+
+  all_markers_df <- do.call(rbind, dfs_all_clusters)
+
+  # Preserve cluster order as factor
+  all_markers_df$cluster <- factor(
+    all_markers_df$cluster,
+    levels = unique(all_markers_df$cluster)
+  )
+
+  
+  all_markers_df <- all_markers_df[, c("gene", setdiff(colnames(all_markers_df), "gene"))]
+
+  # Build sheets
+  sheets_list <- list()
+
+  for (cl in levels(all_markers_df$cluster)) {
+    # Excel sheet name limit 31 characters
+    safe_name <- substr(cl, 1, 31)
+    sheets_list[[safe_name]] <- all_markers_df[all_markers_df$cluster == cl, , drop = FALSE]
+  }
+
+  # Optional combined sheet
+  sheets_list[["all_clusters_combined"]] <- all_markers_df
+
+  # Write workbook
+  out_file <- file.path(
+    agg_dir,
+    paste0("filt_myeloid_subset_", substr(cmp,1,50), "_aggregated.xlsx") 
+  )
+
+  openxlsx::write.xlsx(
+    sheets_list,
+    file = out_file,
+    rowNames = FALSE
+  )
+
+  message(paste0("   written: ", out_file))
+}
+
 ```
 
 
