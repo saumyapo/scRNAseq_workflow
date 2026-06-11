@@ -174,74 +174,181 @@ for (name in names(markers_list)) {
 ```
 
 
-```{r, eval=FALSE, results = FALSE, message = FALSE}
+```{r, warning=FALSE, results = FALSE, message = FALSE}
+
 # Set the path to your CSV files
-csv_dir <- "../csvs/condition/"
+csv_dir <- "../../../csvs/myeloid/condition_DEGs/cluster_wise"
 
 # Prepare gene sets for human
-# Picking the same categories as used for DAVID analysis
+#Picking the same categories as used for DAVID analysis
 set.seed(2024)
-human_gobp_sets <- msigdbr(species = "Homo sapiens", category = "C5", subcollection = "GO:BP")
-human_kegg_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcollection = "CP:KEGG_LEGACY")
-human_reactome_sets <- msigdbr(species = "Homo sapiens", category = "C2", subcollection = "CP:REACTOME")
+human_gobp_sets <- msigdbr(species = "Homo sapiens", collection = "C5", subcollection = "GO:BP")
+human_kegg_sets <- msigdbr(species = "Homo sapiens", collection = "C2", subcollection = "CP:KEGG_LEGACY")
+human_reactome_sets <- msigdbr(species = "Homo sapiens", collection = "C2", subcollection = "CP:REACTOME")
 
 human_gene_sets <- rbind(human_gobp_sets, human_kegg_sets, human_reactome_sets)
 ```
 
-```{r, results=FALSE, message=FALSE, warning=FALSE}
+```{r, warning=FALSE, results = FALSE, message = FALSE}
 # Define the GSEA function for human
+gsea_human <- function(df) {
 
-gsea_human <- function(df, condition){
-  df_cluster <- df %>% dplyr::filter(cluster == condition)
-  lfc_vector <- df_cluster$avg_log2FC
-  names(lfc_vector) <- df_cluster$gene
+  lfc_vector <- df$avg_log2FC
+  names(lfc_vector) <- df$gene
   lfc_vector <- sort(lfc_vector, decreasing = TRUE)
 
-  gsea_results <- GSEA(
-    geneList = lfc_vector, # Ordered ranked gene list
-    minGSSize = 5, # Minimum gene set size
-    maxGSSize = 500, # Maximum gene set size
-    eps = 0, # Boundary for calculating the p value
-    seed = TRUE, # Set seed to make results reproducible
+  term2gene <- human_gene_sets[, c("gs_name", "gene_symbol")]
+
+  gsea_result <- clusterProfiler::GSEA(
+    geneList     = lfc_vector,
+    TERM2GENE    = term2gene,
+    minGSSize    = 5,
+    maxGSSize    = 500,
     pvalueCutoff = 1,
-    pAdjustMethod = "BH", # Benjamini-Hochberg correction
-    TERM2GENE = dplyr::select(human_gene_sets, gs_name, gene_symbol)
+    eps = 0,
+    verbose      = FALSE
   )
-  return(gsea_results@result)
+
+  return(gsea_result)
 }
 ```
 
-```{r, eval=FALSE, results = FALSE, message = FALSE}
-# List all relevant CSV files
-csv_files <- list.files(csv_dir, pattern = "_Condition_vs_Control.csv", full.names = TRUE)
+```{r}
+gsea_dir <- "../../../csvs/myeloid/condition_GSEA/"
+pdf_dir <- "../../../pdfs/myeloid/condition_GSEA/"
 
-# Create a master list to collect results
-all_gsea_results <- list()
+pairwise_comparisons <- list(
+  c("CAR-T Enterocolitis", "CAR-T Control"),
+  c("CAR-T Enterocolitis", "NV"),
+  c("CAR-T Control", "NV")
+)
+```
 
-# Loop through each file
-for (csv_path in csv_files) {
-  subcluster_name <- tools::file_path_sans_ext(basename(csv_path))
-  message("Processing: ", subcluster_name)
 
-  df <- read.csv(csv_path)
 
-  # Skip subclusters with insufficient gene info
-  if (!("gene" %in% colnames(df)) || nrow(df) < 10) {
-    warning("Skipping ", subcluster_name, " due to missing 'gene' column or low gene count.")
-    next
+```{r}
+for (cmp in pairwise_comparisons) {
+
+  cond1 <- cmp[1]
+  cond2 <- cmp[2]
+
+  message("Processing GSEA for: ", cond1, " vs ", cond2)
+
+  csv_files <- list.files(
+    csv_dir,
+    pattern = paste0(cond1, "_vs_", cond2, "\\.csv$"),
+    full.names = TRUE
+  )
+
+  all_gsea_results <- list()
+
+  for (csv_path in csv_files) {
+
+    subcluster_name <- tools::file_path_sans_ext(basename(csv_path))
+    df <- read.csv(csv_path)
+
+    if (!("gene" %in% colnames(df)) || nrow(df) < 10) {
+      warning("Skipping ", subcluster_name)
+      next
+    }
+
+    # Run GSEA
+    gsea_res <- gsea_human(df)
+
+    # Store results table
+    res_df <- gsea_res@result
+    res_df$subcluster <- subcluster_name
+    all_gsea_results[[subcluster_name]] <- res_df
   }
-  condition <- "Condition"
-  gsea_result <- gsea_human(df, condition)
 
+  if (length(all_gsea_results) > 0) {
+    combined_results <- do.call(rbind, all_gsea_results)
 
-  # Append results with an identifying column
-  gsea_result$subcluster <- subcluster_name
-  all_gsea_results[[subcluster_name]] <- gsea_result
+    # Save Excel
+    write.xlsx(
+      combined_results,
+      file = file.path(
+        gsea_dir,
+        paste0("filt_myeloid_subset_GSEA_", cond1, "_vs_", cond2, ".xlsx")
+      )
+    )
+  }
 }
 
-# Combine and export
-combined_results <- do.call(rbind, all_gsea_results)
-write.xlsx(combined_results, file = "../csvs/condition/combined_GSEA_results.xlsx")
+```
+
+
+```{r}
+# Directory containing GSEA excel files
+library(readxl)
+library(dplyr)
+library(openxlsx)
+library(stringr)
+
+input_dir <- "../../../csvs/myeloid/condition_GSEA/"
+output_dir <- input_dir
+
+# Find all GSEA Excel files automatically
+files <- list.files(
+  input_dir,
+  pattern = "GSEA.*\\.xlsx$",
+  full.names = TRUE
+)
+
+for(file in files){
+  
+  message("Processing: ", basename(file))
+  
+  gsea <- read_excel(file)
+  
+  # Split by subcluster
+  subcluster_list <- split(gsea, gsea$subcluster)
+  
+  wb <- createWorkbook()
+  
+  for(sub in names(subcluster_list)){
+    
+    df <- subcluster_list[[sub]]
+    
+    # Filtering
+    df_filt <- df %>%
+      filter(
+        p.adjust < 0.05,
+        abs(NES) >= 1
+      ) %>%
+      arrange(desc(NES))
+    
+    # Skip empty sheets
+    if(nrow(df_filt) == 0) next
+    
+    sheet_name <- str_extract(sub, "(?<=cluster_).+?(?=_CAR-T Enterocolitis|_CAR-T Control|_NV)")
+    cond <- case_when(
+      grepl("CAR-T Enterocolitis", sub) ~ "EC",
+      grepl("CAR-T Control", sub)       ~ "CTRL",
+      grepl("_NV", sub)                 ~ "NV"
+    )
+    sheet_name <- paste0(sheet_name, "_", cond)
+    sheet_name <- substr(sheet_name, 1, 31)
+    if(is.na(sheet_name)) sheet_name <- "all_clusters"
+    
+    addWorksheet(wb, sheet_name)
+    
+    writeData(wb, sheet_name, df_filt)
+    
+  }
+  
+  # Output file name
+  out_file <- file.path(
+    output_dir,
+    paste0(
+      tools::file_path_sans_ext(basename(file)),
+      "_filtered.xlsx"
+    )
+  )
+  
+  saveWorkbook(wb, out_file, overwrite = TRUE)
+  
+}
 ```
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
